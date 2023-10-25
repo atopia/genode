@@ -119,6 +119,14 @@ struct Sculpt::Usb_storage_device : List_model<Usb_storage_device>::Element,
 
 	static bool type_matches(Xml_node node)
 	{
+		typedef String<32>  Id;
+		Id vendor = node.attribute_value("vendor_id", Id());
+		Id product = node.attribute_value("product_id", Id());
+		if (vendor == Id("0x59f") && product == Id("0x1105")) {
+			Genode::warning("Ignoring LaCie external harddrive for storage.");
+
+			return false;
+		}
 		return node.attribute_value("class", String<32>()) == "storage";
 	}
 
