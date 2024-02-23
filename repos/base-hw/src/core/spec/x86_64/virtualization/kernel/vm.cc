@@ -24,9 +24,10 @@
 #include <kernel/vm.h>
 #include <kernel/main.h>
 
+#include <hw/spec/x86_64/x86_64.h>
 #include <virtualization/hypervisor.h>
 #include <virtualization/svm.h>
-#include <hw/spec/x86_64/x86_64.h>
+#include <virtualization/vmx.h>
 
 using namespace Genode;
 
@@ -84,15 +85,31 @@ void Vm::exception(Cpu & cpu)
 {
 	using namespace Board;
 
+	bool pause = false;
+	addr_t table_phys_addr { 0 };
+
 	switch (_vcpu_context.regs->trapno) {
+		case TRAP_VMEXIT: [[fallthrough]];
+		case TRAP_VMX_ERROR:
+			_vcpu_context.exitcode =
+				_vcpu_context.virt.handle_vm_exit(
+					_vcpu_context.regs->trapno);
+			if (_vcpu_context.exitcode != EXIT_PAUSED) {
+				pause = true;
+				break;
+			}
+			[[fallthrough]];
 		case Cpu_state::INTERRUPTS_START ... Cpu_state::INTERRUPTS_END:
 			_interrupt(_user_irq_pool, cpu.id());
-			break;
-		case TRAP_VMEXIT:
-			/* exception method was entered because of a VMEXIT */
-			break;
+			return;
 		case TRAP_VMSKIP:
-			/* exception method was entered without exception */
+			/* vCPU is running for the first time */
+			table_phys_addr =
+			    reinterpret_cast<addr_t>(_id.table);
+			_vcpu_context.initialize(cpu, table_phys_addr);
+			_vcpu_context.tsc_aux_host = cpu.id();
+			_vcpu_context.exitcode     = EXIT_STARTUP;
+			pause = true;
 			break;
 		default:
 			error("VM: triggered unknown exception ",
@@ -105,23 +122,9 @@ void Vm::exception(Cpu & cpu)
 			return;
 	};
 
-	if (_vcpu_context.exitcode == EXIT_INIT) {
-			addr_t table_phys_addr =
-			    reinterpret_cast<addr_t>(_id.table);
-			_vcpu_context.initialize(cpu, table_phys_addr);
-			_vcpu_context.tsc_aux_host = cpu.id();
-			_vcpu_context.exitcode     = EXIT_STARTUP;
-			_pause_vcpu();
-			_context.submit(1);
-			return;
-	}
-
-	_vcpu_context.exitcode = _vcpu_context.virt.handle_vm_exit(
-			_vcpu_context.regs->trapno);
-
-	if (_vcpu_context.exitcode != EXIT_PAUSED) {
-			_pause_vcpu();
-			_context.submit(1);
+	if (pause == true) {
+		_pause_vcpu();
+		_context.submit(1);
 	}
 }
 
