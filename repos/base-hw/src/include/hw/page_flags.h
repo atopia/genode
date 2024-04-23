@@ -16,45 +16,26 @@
 
 #include <base/cache.h>
 #include <base/output.h>
+#include <page_table/page_flags.h>
 
 namespace Hw {
+	using Genode::RO;
+	using Genode::RW;
 
-	enum Writeable   { RO, RW            };
-	enum Executeable { NO_EXEC, EXEC     };
-	enum Privileged  { USER, KERN        };
-	enum Global      { NO_GLOBAL, GLOBAL };
-	enum Type        { RAM, DEVICE       };
+	using Genode::NO_EXEC;
+	using Genode::EXEC;
 
-	struct Page_flags;
+	using Genode::USER;
+	using Genode::KERN;
+
+	using Genode::NO_GLOBAL;
+	using Genode::GLOBAL;
+
+	using Genode::RAM;
+	using Genode::DEVICE;
+
+	using Genode::Page_flags;
 }
-
-
-struct Hw::Page_flags
-{
-	Writeable     writeable;
-	Executeable   executable;
-	Privileged    privileged;
-	Global        global;
-	Type          type;
-	Genode::Cache cacheable;
-
-	void print(Genode::Output & out) const
-	{
-		using Genode::print;
-		using namespace Genode;
-
-		print(out, (writeable == RW)   ? "writeable, " : "readonly, ",
-		           (executable ==EXEC) ? "exec, "      : "noexec, ");
-		if (privileged == KERN)   print(out, "privileged, ");
-		if (global     == GLOBAL) print(out, "global, ");
-		if (type       == DEVICE) print(out, "iomem, ");
-		switch (cacheable) {
-			case UNCACHED:        print(out, "uncached");       break;
-			case CACHED:          print(out, "cached");         break;
-			case WRITE_COMBINED:  print(out, "write-combined"); break;
-		};
-	}
-};
 
 
 namespace Hw {
