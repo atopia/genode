@@ -60,8 +60,9 @@ Hw::Page_table::Allocator & Platform::core_page_table_allocator()
 	using Allocator  = Hw::Page_table::Allocator;
 	using Array      = Allocator::Array<Hw::Page_table::CORE_TRANS_TABLE_COUNT>;
 	addr_t virt_addr = Hw::Mm::core_page_tables().base + sizeof(Hw::Page_table);
+	// FIXME size?
 	return *unmanaged_singleton<Array::Allocator>(_boot_info().table_allocator,
-	                                              virt_addr);
+	                                              virt_addr, Hw::Page_table::CORE_TRANS_TABLE_COUNT);
 }
 
 

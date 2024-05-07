@@ -1,18 +1,19 @@
 /*
  * \brief  Page table allocator
  * \author Stefan Kalkowski
+ * \author Johannes Schlatow
  * \date   2015-06-10
  */
 
 /*
- * Copyright (C) 2015-2017 Genode Labs GmbH
+ * Copyright (C) 2015-2023 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
  */
 
-#ifndef _SRC__LIB__HW__PAGE_TABLE_ALLOCATOR_H_
-#define _SRC__LIB__HW__PAGE_TABLE_ALLOCATOR_H_
+#ifndef _SRC__DRIVERS__PLATFORM__PC__HW__PAGE_TABLE_ALLOCATOR_H_
+#define _SRC__DRIVERS__PLATFORM__PC__HW__PAGE_TABLE_ALLOCATOR_H_
 
 #include <util/bit_allocator.h>
 #include <util/construct_at.h>
@@ -28,9 +29,11 @@ class Hw::Page_table_allocator
 	protected:
 
 		using addr_t = Genode::addr_t;
+		using size_t = Genode::size_t;
 
 		addr_t const  _virt_addr;
 		addr_t const  _phys_addr;
+		size_t const  _size;
 
 		template <typename TABLE> addr_t _offset(TABLE & table) {
 			return (addr_t)&table - _virt_addr; }
@@ -45,29 +48,44 @@ class Hw::Page_table_allocator
 
 		template <unsigned COUNT> class Array;
 
-		Page_table_allocator(addr_t virt_addr, addr_t phys_addr)
-		: _virt_addr(virt_addr), _phys_addr(phys_addr) { }
+		Page_table_allocator(addr_t virt_addr, addr_t phys_addr, size_t size)
+		: _virt_addr(virt_addr), _phys_addr(phys_addr), _size(size) { }
 
 		virtual ~Page_table_allocator() { }
 
-		template <typename TABLE> addr_t phys_addr(TABLE & table) {
-			static_assert((sizeof(TABLE) == TABLE_SIZE), "unexpected size");
-			return _offset(table) + _phys_addr; }
-
-		template <typename TABLE> TABLE & virt_addr(addr_t phys_addr) {
-			static_assert((sizeof(TABLE) == TABLE_SIZE), "unexpected size");
-			return *(TABLE*)(_virt_addr + (phys_addr - _phys_addr)); }
-
-		template <typename TABLE> TABLE & construct() {
-			static_assert((sizeof(TABLE) == TABLE_SIZE), "unexpected size");
-			return *Genode::construct_at<TABLE>(_index(_alloc())); }
-
-		template <typename TABLE> void destruct(TABLE & table)
+		template <typename TABLE, typename FN1, typename FN2>
+		void with_table(addr_t phys_addr, FN1 && match_fn, FN2 no_match_fn)
 		{
 			static_assert((sizeof(TABLE) == TABLE_SIZE), "unexpected size");
-			table.~TABLE();
-			_free((unsigned)(_offset(table) / sizeof(TABLE)));
+
+			if (phys_addr >= _phys_addr && phys_addr < _phys_addr + _size)
+				match_fn(*(TABLE*)(_virt_addr + (phys_addr - _phys_addr)));
+			else
+				no_match_fn();
 		}
+
+		template <typename TABLE> addr_t construct()
+		{
+			static_assert((sizeof(TABLE) == TABLE_SIZE), "unexpected size");
+			TABLE & table = *Genode::construct_at<TABLE>(_index(_alloc()));
+			return _offset(table) + _phys_addr;
+		}
+
+		template <typename TABLE> void destruct(addr_t phys_addr)
+		{
+			static_assert((sizeof(TABLE) == TABLE_SIZE), "unexpected size");
+
+			with_table<TABLE>(phys_addr,
+				[&] (TABLE & table) {
+					table.~TABLE();
+					_free((unsigned)(_offset(table) / sizeof(TABLE)));
+				},
+				[&] () {
+				Genode::error("Trying to destruct foreign table at ", Genode::Hex(phys_addr));
+				});
+		}
+
+		size_t size() const { return _size; }
 };
 
 
@@ -88,11 +106,11 @@ class Hw::Page_table_allocator<TABLE_SIZE>::Array
 
 	public:
 
-		Array() : _alloc((Table*)&_tables, (addr_t)&_tables) {}
+		Array() : _alloc((Table*)&_tables, (addr_t)&_tables, COUNT * TABLE_SIZE) {}
 
 		template <typename T>
 		explicit Array(T phys_addr)
-		: _alloc(_tables, phys_addr((void*)_tables)) { }
+		: _alloc(_tables, phys_addr((void*)_tables), COUNT * TABLE_SIZE) { }
 
 		Page_table_allocator<TABLE_SIZE> & alloc() { return _alloc; }
 };
@@ -123,16 +141,11 @@ class Hw::Page_table_allocator<TABLE_SIZE>::Array<COUNT>::Allocator
 
 	public:
 
-		Allocator(Table * tables, addr_t phys_addr)
-		: Page_table_allocator((addr_t)tables, phys_addr) {}
+		Allocator(Table * tables, addr_t phys_addr, size_t size)
+		: Page_table_allocator((addr_t)tables, phys_addr, size) {}
 
-		Allocator(addr_t phys_addr, addr_t virt_addr)
-		: Page_table_allocator(virt_addr, phys_addr),
-		  _free_tables(static_cast<Allocator*>(&reinterpret_cast<Array*>(virt_addr)->alloc())->_free_tables)
-		{
-			static_assert(!__is_polymorphic(Bit_allocator),
-			              "base class needs to be non-virtual");
-		}
+		Allocator(addr_t virt_addr, addr_t phys_addr, size_t size)
+		: Page_table_allocator(virt_addr, phys_addr, size) {}
 };
 
-#endif /* _SRC__LIB__HW__PAGE_TABLE_ALLOCATOR_H_ */
+#endif /* _SRC__DRIVERS__PLATFORM__PC__HW__PAGE_TABLE_ALLOCATOR_H_ */

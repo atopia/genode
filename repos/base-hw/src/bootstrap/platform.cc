@@ -75,8 +75,10 @@ Platform::Pd::Pd(Platform::Ram_allocator & alloc)
 void Platform::Pd::map(Mapping m)
 {
 	try {
+		// FIXME
+		const Genode::uint32_t supported_page_sizes { 1 << 30 | 1 << 21 | 1 << 12 };
 		table.insert_translation(m.virt(), m.phys(), m.size(), m.flags(),
-		                         array.alloc());
+		                         array.alloc(), false, supported_page_sizes);
 	} catch (Hw::Out_of_tables &) {
 		Genode::error("translation table needs to much RAM");
 	} catch (...) {

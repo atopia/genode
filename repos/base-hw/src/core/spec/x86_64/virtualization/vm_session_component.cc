@@ -39,8 +39,10 @@ void Vm_session_component::_attach(addr_t phys_addr, addr_t vm_addr, size_t size
 	Page_flags pflags { RW, EXEC, USER, NO_GLOBAL, RAM, CACHED };
 
 	try {
+		// FIXME
+		const uint32_t supported_page_sizes { 1 << 30 | 1 << 21 | 1 << 12 };
 		_table.insert_translation(vm_addr, phys_addr, size, pflags,
-		                          _table_array.alloc());
+		                          _table_array.alloc(), false, supported_page_sizes);
 		return;
 	} catch(Hw::Out_of_tables &) {
 		Genode::error("Translation table needs to much RAM");
@@ -65,7 +67,7 @@ void Vm_session_component::attach_pic(addr_t )
 
 void Vm_session_component::_detach_vm_memory(addr_t vm_addr, size_t size)
 {
-	_table.remove_translation(vm_addr, size, _table_array.alloc());
+	_table.remove_translation(vm_addr, size, _table_array.alloc(), true);
 }
 
 

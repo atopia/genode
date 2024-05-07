@@ -20,8 +20,6 @@
 #include <util/misc_math.h>
 #include <clflush.h>
 
-#define assert(expression)
-
 namespace Genode {
 
 	/**
@@ -134,7 +132,6 @@ class Genode::Final_table
 		{
 			for (size_t i = vo >> PAGE_SIZE_LOG2; size > 0;
 			     i = vo >> PAGE_SIZE_LOG2) {
-				assert (i < MAX_ENTRIES);
 				addr_t end = (vo + PAGE_SIZE) & PAGE_MASK;
 				size_t sz  = Genode::min(size, end-vo);
 
@@ -355,7 +352,6 @@ class Genode::Page_directory
 			for (size_t i = vo >> PAGE_SIZE_LOG2; size > 0;
 			     i = vo >> PAGE_SIZE_LOG2)
 			{
-				assert (i < MAX_ENTRIES);
 				addr_t end = (vo + PAGE_SIZE) & PAGE_MASK;
 				size_t sz  = Genode::min(size, end-vo);
 
@@ -541,7 +537,6 @@ class Genode::Pml4_table
 		{
 			for (size_t i = (vo & SIZE_MASK) >> PAGE_SIZE_LOG2; size > 0;
 			     i = (vo & SIZE_MASK) >> PAGE_SIZE_LOG2) {
-				assert (i < MAX_ENTRIES);
 				addr_t end = (vo + PAGE_SIZE) & PAGE_MASK;
 				size_t sz  = Genode::min(size, end-vo);
 
