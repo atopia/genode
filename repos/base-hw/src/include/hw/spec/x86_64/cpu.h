@@ -177,7 +177,13 @@ struct Hw::X86_64_cpu
 	 */
 	X86_64_MSR_REGISTER(Ia32_vmx_basic, 0x480,
 		struct Rev             : Bitfield< 0,31> { }; /* VMCS revision */
+		struct Vmcs_size       : Bitfield<32,13> { }; /* VMCS region size*/
+		struct Phys_addr_width : Bitfield<48, 1> { }; /* VMCS physical address width */
+		struct Dual_monitor    : Bitfield<49, 1> { }; /* Dual-monitor support */
+		struct Memory_type     : Bitfield<50, 4> { }; /* VMCS memory type */
+		struct Ins_outs_exit   : Bitfield<54, 1> { }; /* VM exit info for INS and OUTS instructions, see 27.2.5 */
 		struct Clear_controls  : Bitfield<55, 1> { }; /* VMCS controls may be cleared, see A.2 */
+		struct Deliver_except  : Bitfield<56, 1> { }; /* Deliver hardware exception on entry, see 2 */
 	);
 
 	/*
@@ -271,6 +277,33 @@ struct Hw::X86_64_cpu
 	);
 
 	/*
+	 * Capability Reporting Register of EPT and VPID
+	 * For details, see Vol. 3D of the Intel SDM (September 2023):
+	 * A.10 VPID and EPT Capabilities.”
+	 */
+	X86_64_MSR_REGISTER(Ia32_vmx_ept_vpid_cap, 0x48C,
+		struct Execute_only_translations : Bitfield< 0,1> { }; /* Excecute-only translations support */
+		struct Page_walk_length_4              : Bitfield< 6,1> { }; /* Support page-walk length of 4 */
+		struct Page_walk_length_5              : Bitfield< 7,1> { }; /* Support page-walk length of 5 */
+		struct Uncachable                      : Bitfield< 8,1> { }; /* Paging memory can be uncachable (UC) */
+		struct Writeback                       : Bitfield<14,1> { }; /* Paging memory can be writeback (WB) */
+		struct Map_2mb_page                    : Bitfield<16,1> { }; /* Support 2MB pages */
+		struct Map_1gb_page                    : Bitfield<17,1> { }; /* Support 1Gb pages */
+		struct Invept                          : Bitfield<20,1> { }; /* INVEPT instruction support */
+		struct Accessed_dirty_flags            : Bitfield<21,1> { }; /* Support accessed and dirty flags */
+		struct Vm_exit_info_ept_violations     : Bitfield<22,1> { }; /* Advanced VM-exit information for EPT violations */
+		struct Supervisor_shadow_stack_control : Bitfield<23,1> { }; /* Support for supervisor shadow-stack control */
+		struct Single_context_invept           : Bitfield<25,1> { }; /* Single-context INVEPT support */
+		struct All_context_invept              : Bitfield<26,1> { }; /* All-context INVEPT support */
+		struct Invvpid                         : Bitfield<32,1> { }; /* INVVPID instruction support */
+		struct Individual_address_invvpid      : Bitfield<40,1> { }; /* Individual-address INVVPID support */
+		struct Single_context_invvpid          : Bitfield<41,1> { }; /* Single-context INVVPID support */
+		struct All_context_invvpid             : Bitfield<42,1> { }; /* All-context INVVPID support */
+		struct Single_context_retaining_gobals : Bitfield<43,1> { }; /* Single-context-retaining-globals INVVPID support */
+		struct Max_hlat_prexix_size            : Bitfield<48,6> { }; /* Maximum HLAT prefix size */
+	);
+
+	/*
 	 * Capability Reporting Register of CR0 Bits Fixed to 0
 	 * [sic] in fact, bits reported here need to be 1
 	 * For details, see Vol. 3D of the Intel SDM (September 2023):
@@ -319,9 +352,16 @@ struct Hw::X86_64_cpu
 		struct Pat : Bitfield<16, 1> { };
 	);
 
+	/* Number of address space identifiers (ASID) */
+	X86_64_CPUID_REGISTER(Amd_nasid, 0x8000000A, ebx);
+
 	X86_64_CPUID_REGISTER(Cpuid_15_eax, 15, eax);
 	X86_64_CPUID_REGISTER(Cpuid_15_ebx, 15, ebx);
 	X86_64_CPUID_REGISTER(Cpuid_15_ecx, 15, ecx);
+
+	X86_64_CPUID_REGISTER(Cpuid_8000000A_edx, 0x8000000A, edx,
+		struct Np : Bitfield<0, 1> { }; /* Nested paging */
+	);
 
 	X86_64_CPUID_REGISTER(Cpuid_80000007_eax, 0x80000007, eax,
 		struct Invariant_tsc : Bitfield<2, 1> { }; /* Invariant TSC */

@@ -48,6 +48,9 @@ namespace Board
 enum Vmx_exitcodes : uint32_t {
 	VMX_EXIT_NMI      =  0,
 	VMX_EXIT_INTR     =  1,
+	VMX_EXIT_INV      =  7,
+	VMX_EXIT_CR       = 28,
+	VMX_EXIT_INVLPG   = 14,
 	VMX_EXIT_INVGUEST = 33,
 };
 
@@ -161,6 +164,12 @@ Board::Vmcs
 		 * B.1 16-Bit Fields
 		 */
 
+		/* B.1.1 16-Bit Control Fields */
+		E_VPID                            = 0x00000000,
+		E_POSTED_INT_NOTIFICATION_VEC     = 0x00000002,
+		E_EPTP_INDEX                      = 0x00000004,
+		E_HLAT_PREFIX_SIZE                = 0x00000006,
+
 		/* B.1.2 16-Bit Guest-State Fields */
 		E_GUEST_ES_SELECTOR               = 0x00000800,
 		E_GUEST_CS_SELECTOR               = 0x00000802,
@@ -170,9 +179,14 @@ Board::Vmcs
 		E_GUEST_GS_SELECTOR               = 0x0000080A,
 		E_GUEST_LDTR_SELECTOR             = 0x0000080C,
 		E_GUEST_TR_SELECTOR               = 0x0000080E,
+		E_GUEST_INT_STATUS                = 0x00000810,
+		E_PML_INDEX                       = 0x00000812,
 
 		/* B.1.3 16-Bit Host-State Fields */
+		E_HOST_ES_SELECTOR                = 0x00000C00,
 		E_HOST_CS_SELECTOR                = 0x00000C02,
+		E_HOST_SS_SELECTOR                = 0x00000C04,
+		E_HOST_DS_SELECTOR                = 0x00000C06,
 		E_HOST_FS_SELECTOR                = 0x00000C08,
 		E_HOST_GS_SELECTOR                = 0x00000C0A,
 		E_HOST_TR_SELECTOR                = 0x00000C0C,
@@ -183,26 +197,61 @@ Board::Vmcs
 		 */
 
 		/* B.2.1 64-Bit Control Fields */
+		E_ADDRESS_OF_IO_BITMAP_A          = 0x00002000,
+		E_ADDRESS_OF_IO_BITMAP_B          = 0x00002002,
+		E_ADDRESS_OF_MSR_BITMAPS          = 0x00002004,
 		E_VM_EXIT_MSR_STORE_ADDRESS       = 0x00002006,
 		E_VM_EXIT_MSR_LOAD_ADDRESS        = 0x00002008,
 		E_VM_ENTRY_MSR_LOAD_ADDRESS       = 0x0000200A,
+		E_EXECUTIVE_VMCS_POINTER          = 0x0000200C,
+		E_PML_ADDRESS                     = 0x0000200E,
 		E_TSC_OFFSET                      = 0x00002010,
 		E_VIRTUAL_APIC_ADDRESS            = 0x00002012,
+		E_APIC_ACCESS_ADDRESS             = 0x00002014,
+		E_POSTED_INT_DESC_ADDR            = 0x00002016,
+		E_VM_FUNCTION_CONTROLS            = 0x00002018,
 		E_EPT_POINTER                     = 0x0000201A,
+		E_EOI_EXIT_BITMAP_0               = 0x0000201C,
+		E_EOI_EXIT_BITMAP_1               = 0x0000201E,
+		E_EOI_EXIT_BITMAP_2               = 0x00002020,
+		E_EOI_EXIT_BITMAP_3               = 0x00002022,
+		E_EPT_LIST_ADDRESS                = 0x00002024,
+		E_VMREAD_BITMAP_ADDRESS           = 0x00002026,
+		E_VMWRITE_BITMAP_ADRESS           = 0x00002028,
+		E_VIRT_EXC_INFO_ADDR              = 0x0000202A,
+		E_XSS_EXITING_BITMAP              = 0x0000202C,
+		E_ENCLS_EXITING_BITMAP            = 0x0000202E,
+		E_SUB_PAGE_PERMISSION_TABLE_PTR   = 0x00002030,
+		E_TSC_MTIPLIER                  = 0x00002032ul,
+		E_TERTIARY_VM_EXECUTION_CONTROLS  = 0x00002034,
+		E_ENCLV_EXITING_BITMAP            = 0x00002036,
+		E_PCONFIG_EXITING_BITMAP          = 0x0000203E,
+		E_HLATP                           = 0x00002040,
+		E_SECONDARY_VM_EXECTION_CONROLS   = 0x00002044,
 
 		/* B.2.2 64-Bit Read-Only Data Field */
 		E_GUEST_PHYSICAL_ADDRESS          = 0x00002400,
 
 		/* B.2.3 64-Bit Guest-State Fields */
 		E_VMCS_LINK_POINTER               = 0x00002800,
+		E_GUEST_IA32_DEBUGCTL             = 0x00002802,
+		E_GUEST_IA32_PAT                  = 0x00002804,
 		E_GUEST_IA32_EFER                 = 0x00002806,
+		E_GUEST_IA32_PERF_GLOBAL_CTRL     = 0x00002808,
 		E_GUEST_PDPTE0                    = 0x0000280A,
 		E_GUEST_PDPTE1                    = 0x0000280C,
 		E_GUEST_PDPTE2                    = 0x0000280E,
 		E_GUEST_PDPTE3                    = 0x00002810,
+		E_GUEST_IA32_BNDCFGS              = 0x00002812,
+		E_GUEST_IA32_RTIT_CTL             = 0x00002814,
+		E_GUEST_IA32_LBR_CTL              = 0x00002816,
+		E_GUEST_IA32_PKRS                 = 0x00002818,
 
 		/* B.2.4 64-Bit Host-State Fields */
+		E_HOST_IA32_PAT                   = 0x00002C00,
 		E_HOST_IA32_EFER                  = 0x00002C02,
+		E_HOST_IA32_PERF_GLOBAL_CTRL      = 0x00002C04,
+		E_HOST_IA32_PKRS                  = 0x00002C06,
 
 
 		/*
@@ -226,13 +275,18 @@ Board::Vmcs
 		E_VM_ENTRY_INSTRUCTION_LENGTH     = 0x0000401A,
 		E_TPR_THRESHOLD                   = 0x0000401C,
 		E_SEC_PROC_BASED_VM_EXEC_CTRL     = 0x0000401E,
+		E_PLE_GAP                         = 0x00004020,
+		E_PLE_WINDOW                      = 0x00004022,
 
 		/* B.3.2 32-Bit Read-Only Data Fields */
 		E_VM_INSTRUCTION_ERROR            = 0x00004400,
 		E_EXIT_REASON                     = 0x00004402,
+		E_VM_EXIT_INTERRUPT_INFORMATION   = 0x00004404,
+		E_VM_EXIT_INTERRUPT_ERROR_CODE    = 0x00004406,
 		E_IDT_VECTORING_INFORMATION_FIELD = 0x00004408,
 		E_IDT_VECTORING_ERROR_CODE        = 0x0000440A,
 		E_VM_EXIT_INSTRUCTION_LENGTH      = 0x0000440C,
+		E_VM_EXIT_INSTRUCTION_INFORMATION = 0x0000440E,
 
 		/* B.3.3 32-Bit Guest-State Fields */
 		E_GUEST_ES_LIMIT                  = 0x00004800,
@@ -255,7 +309,9 @@ Board::Vmcs
 		E_GUEST_TR_ACCESS_RIGHTS          = 0x00004822,
 		E_GUEST_INTERRUPTIBILITY_STATE    = 0x00004824,
 		E_GUEST_ACTIVITY_STATE            = 0x00004826,
+		E_GUEST_SMBASE                    = 0x00004828,
 		E_IA32_SYSENTER_CS                = 0x0000482A,
+		E_VMX_PREEMPTION_TIMER_VALUE      = 0x0000482E,
 
 		/* B.3.3 32-Bit Host-State Field */
 		E_HOST_IA32_SYSENTER_CS           = 0x00004C00,
@@ -270,9 +326,18 @@ Board::Vmcs
 		E_CR4_GUEST_HOST_MASK             = 0x00006002,
 		E_CR0_READ_SHADOW                 = 0x00006004,
 		E_CR4_READ_SHADOW                 = 0x00006006,
+		E_CR3_TARGET_VALUE_0              = 0x00006008,
+		E_CR3_TARGET_VALUE_1              = 0x0000600A,
+		E_CR3_TARGET_VALUE_2              = 0x0000600C,
+		E_CR3_TARGET_VALUE_3              = 0x0000600E,
 
 		/* B.4.2 Natural-Width Read-Only Data Fields */
 		E_EXIT_QUALIFICATION              = 0x00006400,
+		E_IO_RCX                          = 0x00006402,
+		E_IO_RSI                          = 0x00006404,
+		E_IO_RDI                          = 0x00006406,
+		E_IO_RIP                          = 0x00006408,
+		E_GUEST_LINEAR_ADDRRESS           = 0x0000640A,
 
 		/* B.4.3 Natural-Width Guest-State Fields */
 		E_GUEST_CR0                       = 0x00006800,
@@ -292,13 +357,19 @@ Board::Vmcs
 		E_GUEST_RSP                       = 0x0000681C,
 		E_GUEST_RIP                       = 0x0000681E,
 		E_GUEST_RFLAGS                    = 0x00006820,
+		E_GUEST_PENDING_DEBUG_EXCEPTIONS  = 0x00006822,
 		E_GUEST_IA32_SYSENTER_ESP         = 0x00006824,
 		E_GUEST_IA32_SYSENTER_EIP         = 0x00006826,
+		E_GUEST_IA32_S_CET                = 0x00006828,
+		E_GUEST_SSP                       = 0x0000682A,
+		E_GUEST_IA32_INT_SSP_TABLE_ADDR   = 0x0000682C,
 
 		/* B.4.4 Natural-Width Host-State Fields */
 		E_HOST_CR0                        = 0x00006C00,
 		E_HOST_CR3                        = 0x00006C02,
 		E_HOST_CR4                        = 0x00006C04,
+		E_HOST_FS_BASE                    = 0x00006C06,
+		E_HOST_GS_BASE                    = 0x00006C08,
 		E_HOST_TR_BASE                    = 0x00006C0A,
 		E_HOST_GDTR_BASE                  = 0x00006C0C,
 		E_HOST_IDTR_BASE                  = 0x00006C0E,
@@ -306,6 +377,9 @@ Board::Vmcs
 		E_HOST_IA32_SYSENTER_EIP          = 0x00006C12,
 		E_HOST_RSP                        = 0x00006C14,
 		E_HOST_RIP                        = 0x00006C16,
+		E_HOST_IA32_S_CET                 = 0x00006C18,
+		E_HOST_SSP                        = 0x00006C1A,
+		E_HOST_IA32_INT_SSP_TABLE_ADDR    = 0x00006C1C,
 	};
 
 	static void vmxon(addr_t phys_addr)
@@ -419,6 +493,8 @@ struct Pin_based_execution_controls : Genode::Register<32>
 	struct Nmi_exiting                  : Bitfield<3,1> { };
 	struct Bit_4                        : Bitfield<4,1> { };
 	struct Virtual_nmis                 : Bitfield<5,1> { };
+	struct Activate_vmx_preemtion_timer : Bitfield<6,1> { };
+	struct Process_posted_interrupts    : Bitfield<7,1> { };
 };
 
 /*
@@ -431,9 +507,34 @@ struct Primary_vm_exit_controls : Genode::Register<32>
 {
 	struct Save_debug_controls        : Bitfield< 2,1> { };
 	struct Host_address_space_size    : Bitfield< 9,1> { };
+	struct Load_ia32_perf_global_ctrl : Bitfield<12,1> { };
 	struct Ack_interrupt_on_exit      : Bitfield<15,1> { };
+	struct Save_ia32_pat              : Bitfield<18,1> { };
+	struct Load_ia32_pat              : Bitfield<19,1> { };
 	struct Save_ia32_efer             : Bitfield<20,1> { };
 	struct Load_ia32_efer             : Bitfield<21,1> { };
+	struct Save_vmx_preemt_timer_val  : Bitfield<22,1> { };
+	struct Clear_ia32_bndcfgs         : Bitfield<23,1> { };
+	struct Conceal_vmx_from_pt        : Bitfield<24,1> { };
+	struct Clear_ia32_rtit_ctl        : Bitfield<25,1> { };
+	struct Clear_ia32_lbr_ctl         : Bitfield<26,1> { };
+	struct Clear_uuinv                : Bitfield<27,1> { };
+	struct Load_cet_state             : Bitfield<28,1> { };
+	struct Load_pkrs                  : Bitfield<29,1> { };
+	struct Save_ia32_perf_global_ctl  : Bitfield<30,1> { };
+	struct Activate_tertiary_controls : Bitfield<31,1> { };
+};
+
+
+/*
+ * Secondary VM-Exit Controls
+ *
+ * For details, see Vol. 3C of the Intel SDM (September 2023):
+ * Table 25-14. Definitions of Secondary VM-Exit Controls
+ */
+struct Secondary_vm_exit_controls : Genode::Register<32>
+{
+	struct Prematurely_busy_shadow_stack : Bitfield< 3,1> { };
 };
 
 
@@ -449,7 +550,18 @@ struct Vm_entry_controls : Genode::Register<32>
 {
 	struct Load_debug_controls               : Bitfield< 2,1> { };
 	struct Ia32e_mode_guest                  : Bitfield< 9,1> { };
+	struct Entry_to_smm                      : Bitfield<10,1> { };
+	struct Deactivate_dual_monitor_treatment : Bitfield<11,1> { };
+	struct Load_ia32_perf_global_ctrl        : Bitfield<13,1> { };
+	struct Load_ia32_pat                     : Bitfield<14,1> { };
 	struct Load_ia32_efer                    : Bitfield<15,1> { };
+	struct Load_ia32_bndcfgs                 : Bitfield<16,1> { };
+	struct Conceal_vmx_from_pt               : Bitfield<17,1> { };
+	struct Load_ia32_rtit_ctl                : Bitfield<18,1> { };
+	struct Load_uinv                         : Bitfield<19,1> { };
+	struct Load_cet_state                    : Bitfield<20,1> { };
+	struct Load_guest_ia32_lbr_ctl           : Bitfield<21,1> { };
+	struct Load_pkrs                         : Bitfield<22,1> { };
 };
 
 
@@ -464,25 +576,72 @@ struct Vm_entry_controls : Genode::Register<32>
 struct Primary_proc_based_execution_controls : Genode::Register<32>
 {
 	struct Interrupt_window_exiting    : Bitfield< 2,1> { };
+	struct Use_tsc_offsetting          : Bitfield< 3,1> { };
 	struct Hlt_exiting                 : Bitfield< 7,1> { };
 	struct Invlpg_exiting              : Bitfield< 9,1> { };
+	struct Mwait_exiting               : Bitfield<10,1> { };
+	struct Rdpmc_exiting               : Bitfield<12,1> { };
 	struct Cr3_load_exiting            : Bitfield<15,1> { };
 	struct Cr3_store_exiting           : Bitfield<16,1> { };
+	struct Activate_tertiary_controls  : Bitfield<17,1> { };
+	struct Cr8_load_exiting            : Bitfield<19,1> { };
+	struct Cr8_store_exiting           : Bitfield<20,1> { };
 	struct Use_tpr_shadow              : Bitfield<21,1> { };
 	struct Nmi_window_exiting          : Bitfield<22,1> { };
+	struct Mov_dr_exiting              : Bitfield<23,1> { };
 	struct Unconditional_io_exiting    : Bitfield<24,1> { };
 	struct Use_io_bitmaps              : Bitfield<25,1> { };
+	struct Monitor_trap_flag           : Bitfield<27,1> { };
 	struct Use_msr_bitmaps             : Bitfield<28,1> { };
+	struct Monitor_exiting             : Bitfield<29,1> { };
+	struct Pause_exiting               : Bitfield<30,1> { };
 	struct Activate_secondary_controls : Bitfield<31,1> { };
 };
 
 /* Table 25-7. Definitions of Secondary Processor-Based VM-Execution Controls */
 struct Secondary_proc_based_execution_controls : Genode::Register<32>
 {
+	struct Virtualize_apic_accesses               : Bitfield< 0,1> { };
 	struct Enable_ept                             : Bitfield< 1,1> { };
+	struct Descriptor_table_exiting               : Bitfield< 2,1> { };
+	struct Enable_rdtscp                          : Bitfield< 3,1> { };
+	struct Vrtualize_x2apic_mode                  : Bitfield< 4,1> { };
 	struct Enable_vpid                            : Bitfield< 5,1> { };
+	struct Wbinvd_exiting                         : Bitfield< 6,1> { };
 	struct Unrestricted_guest                     : Bitfield< 7,1> { };
+	struct Apic_register_virtualization           : Bitfield< 8,1> { };
+	struct Virtual_interrupt_delivery             : Bitfield< 9,1> { };
+	struct Pause_loop_exiting                     : Bitfield<10,1> { };
+	struct Rdrand_exiting                         : Bitfield<11,1> { };
+	struct Enable_invpcid                         : Bitfield<12,1> { };
 	struct Enable_vm_functi                       : Bitfield<13,1> { };
+	struct Vmcs_shadowing                         : Bitfield<14,1> { };
+	struct Enable_encls_exiting                   : Bitfield<15,1> { };
+	struct Rdseed_exiting                         : Bitfield<16,1> { };
+	struct Enable_pml                             : Bitfield<17,1> { };
+	struct Ept_violation_ve                       : Bitfield<18,1> { };
+	struct Conceal_vmx_from_pt                    : Bitfield<19,1> { };
+	struct Enable_xsaves_xrstors                  : Bitfield<20,1> { };
+	struct Mode_based_execut_control_for_ept      : Bitfield<22,1> { };
+	struct Sub_page_write_permissions_for_ept     : Bitfield<23,1> { };
+	struct Intel_pt_uses_guest_physical_addresses : Bitfield<24,1> { };
+	struct Use_tsc_scaling                        : Bitfield<25,1> { };
+	struct Enable_user_wait_and_pause             : Bitfield<26,1> { };
+	struct Enable_pconfig                         : Bitfield<27,1> { };
+	struct Enable_enclv_exiting                   : Bitfield<28,1> { };
+	struct Vmm_bus_Lock_detection                 : Bitfield<30,1> { };
+	struct Instruction_timeout                    : Bitfield<31,1> { };
+};
+
+/*  25-8. Definitions of Tertiary Processor-Based VM-Execution Controls */
+struct Tertiary_proc_based_execution_controls : Genode::Register<32>
+{
+	struct Loadiwkey_exiting         : Bitfield< 0,1> { };
+	struct Enable_hlat               : Bitfield< 1,1> { };
+	struct Ept_paging_write_control  : Bitfield< 2,1> { };
+	struct Guest_paging_verification : Bitfield< 3,1> { };
+	struct Ipi_virtualization        : Bitfield< 4,1> { };
+	struct Virtualize_ia32_spec_ctrl : Bitfield< 7,1> { };
 };
 
 
