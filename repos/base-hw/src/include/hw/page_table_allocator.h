@@ -144,8 +144,11 @@ class Hw::Page_table_allocator<TABLE_SIZE>::Array<COUNT>::Allocator
 		Allocator(Table * tables, addr_t phys_addr, size_t size)
 		: Page_table_allocator((addr_t)tables, phys_addr, size) {}
 
-		Allocator(addr_t virt_addr, addr_t phys_addr, size_t size)
-		: Page_table_allocator(virt_addr, phys_addr, size) {}
+		Allocator(addr_t phys_addr, addr_t virt_addr, size_t size)
+		: Page_table_allocator(virt_addr, phys_addr, size) {
+			static_assert(!__is_polymorphic(Bit_allocator),
+			              "base class needs to be non-virtual");
+		}
 };
 
 #endif /* _SRC__DRIVERS__PLATFORM__PC__HW__PAGE_TABLE_ALLOCATOR_H_ */
