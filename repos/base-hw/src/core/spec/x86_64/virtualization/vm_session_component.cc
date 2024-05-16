@@ -72,7 +72,7 @@ void Vm_session_component::_detach_vm_memory(addr_t vm_addr, size_t size)
 void * Vm_session_component::_alloc_table()
 {
 	/* get some aligned space for the translation table */
-	return cma().alloc_aligned(sizeof(Board::Vm_page_table),
+	return cma().alloc_aligned(sizeof(Hw::Ept),
 	                           Board::Vm_page_table::ALIGNM_LOG2).convert<void *>(
 		[&] (void *table_ptr) {
 			return table_ptr; },
@@ -155,10 +155,15 @@ Vm_session_component::Vm_session_component(Rpc_entrypoint &ds_ep,
 	_constrained_md_ram_alloc(ram_alloc, _ram_quota_guard(), _cap_quota_guard()),
 	_sliced_heap(_constrained_md_ram_alloc, region_map),
 	_region_map(region_map),
-	_table(*construct_at<Board::Vm_page_table>(_alloc_table())),
+	_table([&]() -> Board::Vm_page_table& {
+		if (Hw::Virtualization_support::has_vmx())
+			return *(new (cma()) Board::Vm_page_table_ept(_alloc_table()));
+		else
+			return *(new (cma()) Board::Vm_page_table_hpt(_alloc_table()));
+		}),
 	_table_array(*(new (cma()) Board::Vm_page_table_array([] (void * virt) {
 	                           return (addr_t)cma().phys_addr(virt);}))),
-	_id({(unsigned)alloc().alloc(), cma().phys_addr(&_table)})
+	_id({(unsigned)alloc().alloc(), cma().phys_addr(_table.table_ptr())})
 {
 	/* configure managed VM area */
 	_map.add_range(0UL, ~0UL);
@@ -190,6 +195,7 @@ Vm_session_component::~Vm_session_component()
 	}
 
 	/* free guest-to-host page tables */
+	destroy(platform().core_mem_alloc(), (Hw::Ept *) _table.table_ptr());
 	destroy(platform().core_mem_alloc(), &_table);
 	destroy(platform().core_mem_alloc(), &_table_array);
 	alloc().free(_id.id);
