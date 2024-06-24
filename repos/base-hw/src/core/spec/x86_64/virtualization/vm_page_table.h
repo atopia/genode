@@ -44,59 +44,12 @@ namespace Board {
 
 		static constexpr size_t ALIGNM_LOG2 = Hw::SIZE_LOG2_4KB;
 
-		enum Virt_type {
-			VIRT_TYPE_NONE,
-			VIRT_TYPE_VMX,
-			VIRT_TYPE_SVM
-		};
-
 		union {
 			Hw::Ept ept;
 			Hw::Hpt hpt;
 		};
-
-		void insert_translation(addr_t vo,
-				addr_t pa,
-				size_t size,
-				Page_flags const & flags,
-				Allocator & alloc)
-		{
-			if (virt_type() == VIRT_TYPE_VMX)
-				ept.insert_translation(vo, pa, size, flags, alloc);
-			else if (virt_type() == VIRT_TYPE_SVM)
-				hpt.insert_translation(vo, pa, size, flags, alloc);
-		}
-
-		void remove_translation(addr_t vo, size_t size, Allocator & alloc)
-		{
-			if (virt_type() == VIRT_TYPE_VMX)
-				ept.remove_translation(vo, size, alloc);
-			else if (virt_type() == VIRT_TYPE_SVM)
-				hpt.remove_translation(vo, size, alloc);
-		}
-
-		static Virt_type virt_type() {
-			static Virt_type virt_type { VIRT_TYPE_NONE };
-
-			if (virt_type == VIRT_TYPE_NONE) {
-				if (Hw::Virtualization_support::has_vmx())
-					virt_type = VIRT_TYPE_VMX;
-				else if (Hw::Virtualization_support::has_svm())
-					virt_type = VIRT_TYPE_SVM;
-				else
-					error("Failed to detect Virtualization technology");
-			}
-
-			return virt_type;
-		}
-
 		Vm_page_table()
-		{
-			if (virt_type() == VIRT_TYPE_VMX)
-				Genode::construct_at<Hw::Ept>(this);
-			else if (virt_type() == VIRT_TYPE_SVM)
-				Genode::construct_at<Hw::Hpt>(this);
-		}
+		{ }
 	};
 
 	using Vm_page_table_array =

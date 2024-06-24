@@ -76,18 +76,19 @@ struct Board::Vcpu_context
 	static Virt_interface &detect_virtualization(Vcpu_data &vcpu_data,
 	                                             unsigned   id)
 	{
-		if (Hw::Virtualization_support::has_svm())
-			return *Genode::construct_at<Vmcb>(
-				vcpu_data.virt_area,
-				vcpu_data,
-				id);
-		else if (Hw::Virtualization_support::has_vmx()) {
-			return *Genode::construct_at<Vmcs>(
-				vcpu_data.virt_area,
-				vcpu_data);
-		} else {
-			Genode::error( "No virtualization support detected.");
-			throw Core::Service_denied();
+		switch (Hw::Virtualization_support::virt_type()) {
+			case Hw::VIRT_TYPE_SVM:
+				return *Genode::construct_at<Vmcb>(
+					vcpu_data.virt_area,
+					vcpu_data,
+					id);
+			case Hw::VIRT_TYPE_VMX:
+				return *Genode::construct_at<Vmcs>(
+					vcpu_data.virt_area,
+					vcpu_data);
+			default:
+				Genode::error( "No virtualization support detected.");
+				throw Core::Service_denied();
 		}
 	}
 };

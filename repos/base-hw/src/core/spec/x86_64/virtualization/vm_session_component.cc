@@ -39,7 +39,11 @@ void Vm_session_component::_attach(addr_t phys_addr, addr_t vm_addr, size_t size
 	Page_flags pflags { RW, EXEC, USER, NO_GLOBAL, RAM, CACHED };
 
 	try {
-		_table.insert_translation(vm_addr, phys_addr, size, pflags,
+		if (Hw::Virtualization_support::virt_type() == Hw::VIRT_TYPE_VMX)
+			_table.ept.insert_translation(vm_addr, phys_addr, size, pflags,
+		                          _table_array.alloc());
+		else if (Hw::Virtualization_support::virt_type() == Hw::VIRT_TYPE_SVM)
+			_table.hpt.insert_translation(vm_addr, phys_addr, size, pflags,
 		                          _table_array.alloc());
 		return;
 	} catch(Hw::Out_of_tables &) {
@@ -65,7 +69,10 @@ void Vm_session_component::attach_pic(addr_t )
 
 void Vm_session_component::_detach_vm_memory(addr_t vm_addr, size_t size)
 {
-	_table.remove_translation(vm_addr, size, _table_array.alloc());
+	if (Hw::Virtualization_support::virt_type() == Hw::VIRT_TYPE_VMX)
+		_table.ept.remove_translation(vm_addr, size, _table_array.alloc());
+	else if (Hw::Virtualization_support::virt_type() == Hw::VIRT_TYPE_SVM)
+		_table.hpt.remove_translation(vm_addr, size, _table_array.alloc());
 }
 
 
@@ -162,6 +169,11 @@ Vm_session_component::Vm_session_component(Rpc_entrypoint &ds_ep,
 {
 	/* configure managed VM area */
 	_map.add_range(0UL, ~0UL);
+
+	if (Hw::Virtualization_support::virt_type() == Hw::VIRT_TYPE_VMX)
+		Genode::construct_at<Hw::Ept>(&_table);
+	else if (Hw::Virtualization_support::virt_type() == Hw::VIRT_TYPE_SVM)
+		Genode::construct_at<Hw::Hpt>(&_table);
 }
 
 
