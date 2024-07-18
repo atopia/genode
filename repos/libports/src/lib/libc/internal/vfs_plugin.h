@@ -26,6 +26,7 @@
 #include <unistd.h>
 
 /* libc-internal includes */
+#include <internal/current_time.h>
 #include <internal/plugin.h>
 #include <internal/fd_alloc.h>
 #include <internal/errno.h>
@@ -38,6 +39,29 @@ class Libc::Vfs_plugin final : public Plugin
 	public:
 
 		enum class Update_mtime { NO, YES };
+
+		/*
+		 * Needed to construct a sync object from a Vfs_plugin / Plugin reference.
+		 */
+		class Sync
+		{
+			private:
+
+				enum { INITIAL, TIMESTAMP_UPDATED, QUEUED, COMPLETE } _state { INITIAL };
+
+				Vfs::Vfs_handle &_vfs_handle;
+				Vfs::Timestamp   _mtime { Vfs::Timestamp::INVALID };
+
+			public:
+
+				Sync(Vfs::Vfs_handle &vfs_handle, Libc::Vfs_plugin::Update_mtime update_mtime,
+				     Libc::Current_real_time &current_real_time);
+
+				Sync(Vfs::Vfs_handle &vfs_handle, Plugin & plugin);
+
+				bool complete();
+		};
+
 
 		/**
 		 * Return path to pseudo files used for ioctl operations of a given FD

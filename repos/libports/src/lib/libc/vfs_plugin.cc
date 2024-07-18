@@ -44,7 +44,6 @@
 #include <internal/errno.h>
 #include <internal/init.h>
 #include <internal/monitor.h>
-#include <internal/current_time.h>
 
 
 static Libc::Monitor      *_monitor_ptr;
@@ -543,51 +542,63 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags)
 }
 
 
-struct Sync
+Libc::Vfs_plugin::Sync::Sync(Vfs::Vfs_handle &vfs_handle, Libc::Vfs_plugin::Update_mtime update_mtime,
+	         Libc::Current_real_time &current_real_time)
+:
+	_vfs_handle(vfs_handle)
 {
-	enum { INITIAL, TIMESTAMP_UPDATED, QUEUED, COMPLETE } state { INITIAL };
+	if (update_mtime == Libc::Vfs_plugin::Update_mtime::NO
+	 || !current_real_time.has_real_time()) {
 
-	Vfs::Vfs_handle &vfs_handle;
-	Vfs::Timestamp   mtime { Vfs::Timestamp::INVALID };
+		_state = TIMESTAMP_UPDATED;
 
-	Sync(Vfs::Vfs_handle &vfs_handle, Libc::Vfs_plugin::Update_mtime update_mtime,
-	     Libc::Current_real_time &current_real_time)
-	:
-		vfs_handle(vfs_handle)
-	{
-		if (update_mtime == Libc::Vfs_plugin::Update_mtime::NO
-		 || !current_real_time.has_real_time()) {
+	} else {
+		timespec const ts = current_real_time.current_real_time();
 
-			state = TIMESTAMP_UPDATED;
-
-		} else {
-			timespec const ts = current_real_time.current_real_time();
-
-			mtime = { .value = (long long)ts.tv_sec };
-		}
+		_mtime = { .value = (long long)ts.tv_sec };
 	}
+}
 
-	bool complete()
-	{
-		switch (state) {
-		case Sync::INITIAL:
-			if (!vfs_handle.fs().update_modification_timestamp(&vfs_handle, mtime))
-				return false;
-			state = Sync::TIMESTAMP_UPDATED; [[ fallthrough ]];
-		case Sync::TIMESTAMP_UPDATED:
-			if (!vfs_handle.fs().queue_sync(&vfs_handle))
-				return false;
-			state = Sync::QUEUED; [[ fallthrough ]];
-		case Sync::QUEUED:
-			if (vfs_handle.fs().complete_sync(&vfs_handle) == Vfs::File_io_service::SYNC_QUEUED)
-				return false;
-			state = Sync::COMPLETE; [[ fallthrough ]];
-		case Sync::COMPLETE:
-			break;
-		}
-		return true;
+
+
+Libc::Vfs_plugin::Sync::Sync(Vfs::Vfs_handle &vfs_handle, Plugin & plugin)
+:
+	_vfs_handle(vfs_handle)
+{
+	Vfs_plugin & vfs_plugin = reinterpret_cast<Vfs_plugin &>(plugin);
+	if (vfs_plugin._update_mtime == Libc::Vfs_plugin::Update_mtime::NO
+	 || !vfs_plugin._current_real_time.has_real_time()) {
+
+		_state = TIMESTAMP_UPDATED;
+
+	} else {
+		timespec const ts = vfs_plugin._current_real_time.current_real_time();
+
+		_mtime = { .value = (long long)ts.tv_sec };
 	}
-};
+}
+
+
+bool Libc::Vfs_plugin::Sync::complete()
+{
+	switch (_state) {
+	case Sync::INITIAL:
+		if (!_vfs_handle.fs().update_modification_timestamp(&_vfs_handle, _mtime))
+			return false;
+		_state = Sync::TIMESTAMP_UPDATED; [[ fallthrough ]];
+	case Sync::TIMESTAMP_UPDATED:
+		if (!_vfs_handle.fs().queue_sync(&_vfs_handle))
+			return false;
+		_state = Sync::QUEUED; [[ fallthrough ]];
+	case Sync::QUEUED:
+		if (_vfs_handle.fs().complete_sync(&_vfs_handle) == Vfs::File_io_service::SYNC_QUEUED)
+			return false;
+		_state = Sync::COMPLETE; [[ fallthrough ]];
+	case Sync::COMPLETE:
+		break;
+	}
+	return true;
+}
 
 
 int Libc::Vfs_plugin::close_from_kernel(File_descriptor *fd)
