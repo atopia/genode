@@ -35,6 +35,8 @@ class Libc::Kqueue_plugin : public Libc::Plugin
 
 		int create_kqueue();
 		int close(File_descriptor *) override;
+
+		static int process_single_event(int, struct kevent const *);
 };
 
 #endif /* _LIBC__INTERNAL__KQUEUE_H_ */

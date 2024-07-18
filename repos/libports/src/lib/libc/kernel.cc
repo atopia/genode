@@ -515,6 +515,7 @@ Libc::Kernel::Kernel(Genode::Env &env, Genode::Allocator &heap)
 	init_passwd(_passwd_config());
 	init_signal(_signal);
 	init_kqueue(_heap, *this);
+	init_aio(_heap, *this, _signal);
 
 	_init_file_descriptors();
 

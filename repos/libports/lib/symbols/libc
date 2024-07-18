@@ -50,6 +50,13 @@ abs T
 accept T
 accept4 T
 access T
+aio_cancel T
+aio_error T
+aio_fsync T
+aio_read T
+aio_return T
+aio_suspend T
+aio_write T
 alarm T
 alphasort T
 arc4random T

@@ -99,8 +99,9 @@ struct Libc::Kqueue
 		EV_DISABLE;
 
 	const int filter_whitelist =
-		EVFILT_READ |
-		EVFILT_WRITE;
+		EVFILT_READ  |
+		EVFILT_WRITE |
+		EVFILT_AIO;
 
 	struct Kqueue_flags : Genode::Register<32> {
 		struct Add     : Bitfield<    pos(EV_ADD), 1> { };
@@ -426,6 +427,16 @@ struct Libc::Kqueue
 						num_events++;
 					}
 					break;
+				case EVFILT_AIO:
+					eventlist[num_events++] = ele;
+					/*
+					 * If EV_CLEAR is set, remove the element so that only a newly
+					 * added AIO notification is reported at the next query.
+					 */
+					if (Kqueue_flags::Clear::get(ele.flags)) {
+						_queue_for_deletion(ele);
+					}
+					break;
 				default:
 					assert(false && "Element with unknown filter inserted");
 				}
@@ -505,6 +516,21 @@ int Libc::Kqueue_plugin::close(File_descriptor *fd)
 	file_descriptor_allocator()->free(fd);
 
 	return 0;
+}
+
+
+int Libc::Kqueue_plugin::process_single_event(int kqueue_fd, struct kevent const *event)
+{
+	File_descriptor *fd = libc_fd_to_fd(kqueue_fd, "kevent");
+
+	if (!fd || (fd->plugin != kqueue_plugin())) {
+		error("File descriptor not reqistered to kqueue plugin");
+		return Errno(EBADF);
+	}
+
+	Kqueue *kq = reinterpret_cast<Libc::Kqueue *>(fd->context);
+
+	return kq->process_events(event, 1, NULL, 0);
 }
 
 

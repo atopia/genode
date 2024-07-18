@@ -161,6 +161,11 @@ namespace Libc {
 	 * Kqueue support
 	 */
 	void init_kqueue(Genode::Allocator &, Monitor &);
+
+	/*
+	 * AIO support
+	 */
+	void init_aio(Genode::Allocator &, Monitor &, Signal &);
 }
 
 #endif /* _LIBC__INTERNAL__INIT_H_ */
