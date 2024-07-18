@@ -30,7 +30,7 @@ namespace Genode { class Env; }
 namespace Libc {
 
 	using namespace Genode;
-	
+
 	class File_descriptor;
 
 	using Absolute_path = Genode::Path<PATH_MAX>;
@@ -77,6 +77,20 @@ namespace Libc {
 			virtual bool supports_symlink(const char *oldpath, const char *newpath);
 			virtual bool supports_unlink(const char *path);
 			virtual bool supports_mmap();
+
+			/*
+			 * Asynchronous helper methods
+			 */
+			struct Async_read_state {
+				bool complete_read { false };
+			};
+			virtual bool async_read(File_descriptor *, void *, ::size_t, ::off_t, ssize_t &, int &, Async_read_state &);
+
+			struct Async_write_state {
+				bool  first_run { true };
+				size_t bytes_written { 0 };
+			};
+			virtual bool async_write(File_descriptor *, const void *, ::size_t, ::off_t, ssize_t &, int &, Async_write_state &);
 
 			/*
 			 * Should be overwritten for plugins that require the Genode environment

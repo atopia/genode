@@ -223,6 +223,12 @@ class Libc::Vfs_plugin final : public Plugin
 		bool supports_unlink(const char *)                     override { return true; }
 		bool supports_mmap()                                   override { return true; }
 
+		/*
+		 * Helper functions to use in the context of a monitor job
+		 */
+		bool async_read(File_descriptor *, void *, ::size_t, ::off_t, ssize_t &, int &, Async_read_state &) override;
+		bool async_write(File_descriptor *, const void *, ::size_t, ::off_t, ssize_t &, int &, Async_write_state &) override;
+
 		/* kernel-specific API without monitor */
 		File_descriptor *open_from_kernel(const char *, int, int libc_fd);
 		int close_from_kernel(File_descriptor *);

@@ -21,6 +21,8 @@
 #include <internal/init.h>
 #include <internal/resume.h>
 
+#include <errno.h>
+
 using namespace Libc;
 
 
@@ -137,6 +139,27 @@ bool Plugin::supports_unlink(const char*)
 bool Plugin::supports_mmap()
 {
 	return false;
+}
+
+
+/*
+ * Asynchronous helper functions
+ */
+bool Plugin::async_read(File_descriptor *, void *, ::size_t, ::off_t, ssize_t &retval, int &error, Async_read_state &)
+{
+	error = EBADF;
+	retval = -1;
+
+	return true;
+}
+
+
+bool Plugin::async_write(File_descriptor *, const void *, ::size_t, ::off_t, ssize_t &retval, int &error, Async_write_state &)
+{
+	error = EBADF;
+	retval = -1;
+
+	return true;
 }
 
 

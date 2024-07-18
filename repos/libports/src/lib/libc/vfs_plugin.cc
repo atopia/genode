@@ -833,43 +833,145 @@ int Libc::Vfs_plugin::stat(char const *path, struct stat *buf)
 }
 
 
-ssize_t Libc::Vfs_plugin::write(File_descriptor *fd, const void *buf,
-                                ::size_t count)
+bool Libc::Vfs_plugin::async_read(File_descriptor  *fd,
+                                  void             *buf,
+                                  ::size_t          count,
+                                  ::off_t           offset,
+                                  ssize_t          &result,
+                                  int              &result_errno,
+				  Async_read_state &read_state)
 {
-	using Result = Vfs::File_io_service::Write_result;
+	using Result = Vfs::File_io_service::Read_result;
 
-	if ((fd->flags & O_ACCMODE) == O_RDONLY) {
-		return Errno(EBADF);
+	if ((fd->flags & O_ACCMODE) == O_WRONLY) {
+		result_errno = EBADF;
+		result = -1;
+		return true;
+	}
+
+	if (fd->flags & O_DIRECTORY) {
+		result_errno = EISDIR;
+		result = -1;
+		return true;
 	}
 
 	Vfs::Vfs_handle *handle = vfs_handle(fd);
 
-	::size_t out_count  = 0;
-	Result   out_result = Result::WRITE_OK;
+	if (!read_state.complete_read) {
+		if (fd->flags & O_NONBLOCK && !read_ready_from_kernel(fd)) {
+			result_errno = EAGAIN;
+			result = -1;
+			return true;
+		}
 
-	Const_byte_range_ptr const src { (char const *)buf, count };
+		size_t initial_seek = handle->seek();
+		if (offset)
+			handle->seek(offset);
+
+		if (!handle->fs().queue_read(handle, count)) {
+			handle->seek(initial_seek);
+			return false;
+		}
+	}
+
+	Byte_range_ptr const dst { (char *)buf, count };
+	size_t out_count;
+	Result out_result = handle->fs().complete_read(handle, dst, out_count);
+
+	if (out_result == Result::READ_QUEUED) {
+		read_state.complete_read = true;
+		return false;
+	}
+
+	switch (out_result) {
+	case Result::READ_ERR_WOULD_BLOCK:
+		result_errno = EWOULDBLOCK;
+		result = -1;
+		break;
+	case Result::READ_ERR_INVALID:
+		result_errno = EINVAL;
+		result = -1;
+		break;
+	case Result::READ_ERR_IO:
+		result_errno = EIO;
+		result = -1;
+	case Result::READ_OK:
+		result_errno = 0;
+		result = out_count;
+		break;
+	case Result::READ_QUEUED:
+		/* handled above, so never reached */
+		break;
+	}
+
+	return true;
+}
+
+
+ssize_t Libc::Vfs_plugin::read(File_descriptor *fd, void *buf,
+                               ::size_t count)
+{
+	int result_errno { 0 };
+
+	/*
+	 * out_count needs to be initialized to 0 because it is used to track state
+	 */
+	ssize_t out_count { 0 };
+
+	Async_read_state state;
+	monitor().monitor([&] {
+		return async_read(fd, buf, count, 0, out_count, result_errno, state) ? Fn::COMPLETE : Fn::INCOMPLETE;
+	});
+
+	if (result_errno)
+		return Errno(result_errno);
+
+	Plugin::resume_all();
+
+	Vfs::Vfs_handle *handle = vfs_handle(fd);
+	handle->advance_seek(out_count);
+
+	return out_count;
+}
+
+
+bool Libc::Vfs_plugin::async_write(File_descriptor   *fd,
+                                   void const        *buf,
+                                   ::size_t           count,
+                                   ::off_t            offset,
+                                   ssize_t           &retval,
+                                   int               &result_errno,
+                                   Async_write_state &write_state)
+{
+	using Result = Vfs::File_io_service::Write_result;
+
+	if ((fd->flags & O_ACCMODE) == O_RDONLY) {
+		result_errno = EBADF;
+		retval = -1;
+		return true;
+	}
+
+	Vfs::Vfs_handle *handle = vfs_handle(fd);
+
+	Result out_result = Result::WRITE_OK;
+
+	if (offset && write_state.first_run)
+		handle->seek(offset);
+
+	write_state.first_run = false;
 
 	if (fd->flags & O_NONBLOCK) {
-		monitor().monitor([&] {
-			out_result = handle->fs().write(handle, src, out_count);
-			return Fn::COMPLETE;
-		});
+		Const_byte_range_ptr const src { (char const *)buf, count };
+
+		out_result = handle->fs().write(handle, src, write_state.bytes_written);
+
+		if (out_result == Result::WRITE_OK)
+			handle->advance_seek(write_state.bytes_written);
 	} else {
-		Vfs::file_size const initial_seek { handle->seek() };
-
-		/* TODO clean this up */
-		char const * const _fd_path    { fd->fd_path };
-		Vfs::Vfs_handle   *_handle     { handle };
-		void const        *_buf        { buf };
-		::size_t           _count      { count };
-		::size_t          &_out_count  { out_count };
-		Result            &_out_result { out_result };
-		::off_t            _offset     { 0 };
-		unsigned           _iteration  { 0 };
-
 		auto _fd_refers_to_continuous_file = [&]
 		{
-			if (!_fd_path) {
+			char const * const fd_path { fd->fd_path };
+			if (!fd_path) {
 				warning("Vfs_plugin: _fd_refers_to_continuous_file: missing fd_path");
 				return false;
 			}
@@ -878,139 +980,100 @@ ssize_t Libc::Vfs_plugin::write(File_descriptor *fd, const void *buf,
 
 			Vfs::Directory_service::Stat stat { };
 
-			if (_root_fs.stat(_fd_path, stat) != Result::STAT_OK)
+			if (_root_fs.stat(fd_path, stat) != Result::STAT_OK)
 				return false;
 
 			return stat.type == Vfs::Node_type::CONTINUOUS_FILE;
 		};
 
-		monitor().monitor([&]
-		{
-			for (;;) {
+		for (;;) {
+			/* number of bytes written in one iteration */
+			::size_t partial_out_count = 0;
 
-				/* number of bytes written in one iteration */
-				::size_t partial_out_count = 0;
+			/* Subtract already written bytes from count */
+			::size_t remaining_count = count - write_state.bytes_written;
 
-				Const_byte_range_ptr const src { (char const *)_buf + _offset,
-				                                  _count };
+			Const_byte_range_ptr const src { (char const *)buf + write_state.bytes_written,
+				                          remaining_count };
 
-				_out_result = _handle->fs().write(_handle, src, partial_out_count);
+			out_result = handle->fs().write(handle, src, partial_out_count);
 
-				if (_out_result == Result::WRITE_ERR_WOULD_BLOCK)
-					return Fn::INCOMPLETE;
+			if (out_result == Result::WRITE_ERR_WOULD_BLOCK)
+				return false;
 
-				if (_out_result != Result::WRITE_OK)
-					return Fn::COMPLETE;
+			if (out_result != Result::WRITE_OK)
+				break;
 
-				/* increment byte count reported to caller */
-				_out_count += partial_out_count;
+			bool const stalled = (partial_out_count == 0);
+			if (stalled)
+				return false;
 
-				bool const write_complete = (partial_out_count == _count);
-				if (write_complete)
-					return Fn::COMPLETE;
+			bool const write_complete = (partial_out_count == remaining_count);
 
-				/*
-				 * If the write has not consumed all bytes, set up
-				 * another partial write iteration with the remaining
-				 * bytes as 'count'.
-				 *
-				 * The costly 'fd_refers_to_continuous_file' is called
-				 * for the first iteration only.
-				 */
-				bool const continuous_file = (_iteration > 0 || _fd_refers_to_continuous_file());
+			if (!write_complete) {
+				bool const continuous_file = (write_state.bytes_written || _fd_refers_to_continuous_file());
 
 				if (!continuous_file) {
 					warning("partial write on transactional file");
-					_out_result = Result::WRITE_ERR_IO;
-					return Fn::COMPLETE;
+					out_result = Result::WRITE_ERR_IO;
+					break;
 				}
-
-				_iteration++;
-
-				bool const stalled = (partial_out_count == 0);
-				if (stalled) {
-					return Fn::INCOMPLETE;
-				}
-
-				/* issue new write operation for remaining bytes */
-				_count  -= partial_out_count;
-				_offset += partial_out_count;
-				_handle->advance_seek(partial_out_count);
 			}
-		});
 
-		/* XXX reset seek pointer after loop (will be advanced below by out_count) */
-		handle->seek(initial_seek);
+			write_state.bytes_written += partial_out_count;
+
+			handle->advance_seek(partial_out_count);
+
+			if (write_complete)
+				break;
+		}
 	}
-
-	Plugin::resume_all();
 
 	switch (out_result) {
-	case Result::WRITE_ERR_WOULD_BLOCK: return Errno(EWOULDBLOCK);
-	case Result::WRITE_ERR_INVALID:     return Errno(EINVAL);
-	case Result::WRITE_ERR_IO:          return Errno(EIO);
-	case Result::WRITE_OK:              break;
+	/* Not reached */
+	case Result::WRITE_ERR_WOULD_BLOCK:
+		result_errno = EWOULDBLOCK;
+		retval = -1;
+		break;
+	case Result::WRITE_ERR_INVALID:
+		result_errno = EINVAL;
+		retval = -1;
+		break;
+	case Result::WRITE_ERR_IO:
+		result_errno = EIO;
+		retval = -1;
+		break;
+	case Result::WRITE_OK:
+		retval = write_state.bytes_written;
+		result_errno = 0;
+		break;
 	}
 
-	handle->advance_seek(out_count);
-	fd->modified = true;
-
-	return out_count;
+	return true;
 }
 
 
-ssize_t Libc::Vfs_plugin::read(File_descriptor *fd, void *buf,
-                               ::size_t count)
+
+
+ssize_t Libc::Vfs_plugin::write(File_descriptor *fd, const void *buf,
+                                ::size_t count)
 {
-	if ((fd->flags & O_ACCMODE) == O_WRONLY) {
-		return Errno(EBADF);
-	}
+	int               result_errno { 0 };
+	ssize_t           retval       { 0 };
+	Async_write_state write_state;
 
-	using Result = Vfs::File_io_service::Read_result;
-
-	Vfs::Vfs_handle *handle = vfs_handle(fd);
-
-	if (fd->flags & O_DIRECTORY)
-		return Errno(EISDIR);
-
-	/* TODO refactor multiple monitor() calls to state machine in one call */
-	bool succeeded = false;
-	int result_errno = 0;
 	monitor().monitor([&] {
-		if (fd->flags & O_NONBLOCK && !read_ready_from_kernel(fd)) {
-			result_errno = EAGAIN;
-			return Fn::COMPLETE;
-		}
-		succeeded = true;
-		return handle->fs().queue_read(handle, count) ? Fn::COMPLETE : Fn::INCOMPLETE;
+		return async_write(fd, buf, count, 0, retval, result_errno, write_state) ? Fn::COMPLETE : Fn::INCOMPLETE;
 	});
 
-	if (!succeeded)
+	if (result_errno)
 		return Errno(result_errno);
-
-	::size_t out_count = 0;
-	Result   out_result;
-
-	monitor().monitor([&] {
-		Byte_range_ptr const dst { (char *)buf, count };
-		out_result = handle->fs().complete_read(handle, dst, out_count);
-		return out_result != Result::READ_QUEUED ? Fn::COMPLETE : Fn::INCOMPLETE;
-	});
 
 	Plugin::resume_all();
 
-	switch (out_result) {
-	case Result::READ_ERR_WOULD_BLOCK: return Errno(EWOULDBLOCK);
-	case Result::READ_ERR_INVALID:     return Errno(EINVAL);
-	case Result::READ_ERR_IO:          return Errno(EIO);
-	case Result::READ_OK:              break;
+	fd->modified = true;
 
-	case Result::READ_QUEUED: /* handled above, so never reached */ break;
-	}
-
-	handle->advance_seek(out_count);
-
-	return out_count;
+	return retval;
 }
 
 
