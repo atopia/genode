@@ -672,6 +672,7 @@ set default_test_pkgs {
 	test-init_loop
 	test-ldso
 	test-libc
+	test-libc_aio
 	test-libc_alarm
 	test-libc_connect_lwip
 	test-libc_connect_lxip
