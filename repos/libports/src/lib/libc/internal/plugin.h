@@ -79,18 +79,22 @@ namespace Libc {
 			virtual bool supports_mmap();
 
 			/*
-			 * Asynchronous helper methods
+			 * Asynchronous I/O
 			 */
-			struct Async_read_state {
-				bool complete_read { false };
-			};
-			virtual bool async_read(File_descriptor *, void *, ::size_t, ::off_t, ssize_t &, int &, Async_read_state &);
+			struct Async_result
+			{
+				bool complete;
 
-			struct Async_write_state {
-				bool  first_run { true };
-				size_t bytes_written { 0 };
+				/* value that would be returned by the corresponding read() etc. */
+				ssize_t return_status;
+
+				/* errno value that would be set by the corresponding read() etc. */
+				int error_status;
 			};
-			virtual bool async_write(File_descriptor *, const void *, ::size_t, ::off_t, ssize_t &, int &, Async_write_state &);
+
+			virtual Async_result async_read(File_descriptor *, void *, ::size_t, ::off_t);
+
+			virtual Async_result async_write(File_descriptor *, const void *, ::size_t, ::off_t);
 
 			/*
 			 * Should be overwritten for plugins that require the Genode environment
