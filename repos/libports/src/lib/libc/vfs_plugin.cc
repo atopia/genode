@@ -946,37 +946,38 @@ ssize_t Libc::Vfs_plugin::read(File_descriptor *fd, void *buf,
 }
 
 
-Libc::Vfs_plugin::Async_result
-Libc::Vfs_plugin::async_write(File_descriptor   *fd,
-                              void const        *buf,
-                              ::size_t           count,
-                              ::off_t            offset)
+bool Libc::Vfs_plugin::async_write(File_descriptor   *fd,
+                                   void const        *buf,
+                                   ::size_t           count,
+                                   ::off_t            offset,
+                                   ssize_t           &retval,
+                                   int               &result_errno,
+                                   Async_write_state &write_state)
 {
 	using Result = Vfs::File_io_service::Write_result;
 
-	if ((fd->flags & O_ACCMODE) == O_RDONLY)
-		return { true, -1, EBADF };
+	if ((fd->flags & O_ACCMODE) == O_RDONLY) {
+		result_errno = EBADF;
+		retval = -1;
+		return true;
+	}
 
 	Vfs::Vfs_handle *handle = vfs_handle(fd);
 
 	Result out_result = Result::WRITE_OK;
 
-	size_t bytes_written = 0;
+	if (offset && write_state.first_run)
+		handle->seek(offset);
 
-/* FIXME seek is not relevant for aio - thus implement in ::write only */
-//	if (offset && write_state.first_run)
-//		handle->seek(offset);
-//
-//	write_state.first_run = false;
+	write_state.first_run = false;
 
 	if (fd->flags & O_NONBLOCK) {
 		Const_byte_range_ptr const src { (char const *)buf, count };
 
-		out_result = handle->fs().write(handle, src, bytes_written);
+		out_result = handle->fs().write(handle, src, write_state.bytes_written);
 
-/* FIXME seek is not relevant for aio - thus implement in ::write only */
-//		if (out_result == Result::WRITE_OK)
-//			handle->advance_seek(write_state.bytes_written);
+		if (out_result == Result::WRITE_OK)
+			handle->advance_seek(write_state.bytes_written);
 	} else {
 		auto _fd_refers_to_continuous_file = [&]
 		{
@@ -1001,9 +1002,9 @@ Libc::Vfs_plugin::async_write(File_descriptor   *fd,
 			::size_t partial_out_count = 0;
 
 			/* Subtract already written bytes from count */
-			::size_t remaining_count = count - bytes_written;
+			::size_t remaining_count = count - write_state.bytes_written;
 
-			Const_byte_range_ptr const src { (char const *)buf + bytes_written,
+			Const_byte_range_ptr const src { (char const *)buf + write_state.bytes_written,
 				                          remaining_count };
 
 			out_result = handle->fs().write(handle, src, partial_out_count);
@@ -1021,7 +1022,7 @@ Libc::Vfs_plugin::async_write(File_descriptor   *fd,
 			bool const write_complete = (partial_out_count == remaining_count);
 
 			if (!write_complete) {
-				bool const continuous_file = (bytes_written || _fd_refers_to_continuous_file());
+				bool const continuous_file = (write_state.bytes_written || _fd_refers_to_continuous_file());
 
 				if (!continuous_file) {
 					warning("partial write on transactional file");
@@ -1030,7 +1031,7 @@ Libc::Vfs_plugin::async_write(File_descriptor   *fd,
 				}
 			}
 
-			bytes_written += partial_out_count;
+			write_state.bytes_written += partial_out_count;
 
 			handle->advance_seek(partial_out_count);
 
@@ -1041,13 +1042,25 @@ Libc::Vfs_plugin::async_write(File_descriptor   *fd,
 
 	switch (out_result) {
 	/* Not reached */
-	case Result::WRITE_ERR_WOULD_BLOCK: return { true, -1, EWOULDBLOCK };
-	case Result::WRITE_ERR_INVALID:     return { true, -1, EINVAL };
-	case Result::WRITE_ERR_IO:          return { true, -1, EIO };
-	case Result::WRITE_OK:              return { true, -1, bytes_written };
+	case Result::WRITE_ERR_WOULD_BLOCK:
+		result_errno = EWOULDBLOCK;
+		retval = -1;
+		break;
+	case Result::WRITE_ERR_INVALID:
+		result_errno = EINVAL;
+		retval = -1;
+		break;
+	case Result::WRITE_ERR_IO:
+		result_errno = EIO;
+		retval = -1;
+		break;
+	case Result::WRITE_OK:
+		retval = write_state.bytes_written;
+		result_errno = 0;
+		break;
 	}
-//
-//	return true;
+
+	return true;
 }
 
 
