@@ -966,13 +966,11 @@ bool Libc::Vfs_plugin::async_write(File_descriptor   *fd,
 
 	Result out_result = Result::WRITE_OK;
 
-	if (offset && write_state.first_run)
-		handle->seek(offset);
-
-	write_state.first_run = false;
-
 	if (fd->flags & O_NONBLOCK) {
 		Const_byte_range_ptr const src { (char const *)buf, count };
+
+		if (offset && !(fd->flags & O_APPEND))
+			handle->seek(offset);
 
 		out_result = handle->fs().write(handle, src, write_state.bytes_written);
 
@@ -1006,6 +1004,13 @@ bool Libc::Vfs_plugin::async_write(File_descriptor   *fd,
 
 			Const_byte_range_ptr const src { (char const *)buf + write_state.bytes_written,
 				                          remaining_count };
+
+                        /*
+                         * Always seek to the write position in case async
+                         * writes are intertwined.
+                         */
+                        if (!(fd->flags & O_APPEND))
+				handle->seek(offset + write_state.bytes_written);
 
 			out_result = handle->fs().write(handle, src, partial_out_count);
 
@@ -1041,7 +1046,6 @@ bool Libc::Vfs_plugin::async_write(File_descriptor   *fd,
 	}
 
 	switch (out_result) {
-	/* Not reached */
 	case Result::WRITE_ERR_WOULD_BLOCK:
 		result_errno = EWOULDBLOCK;
 		retval = -1;
