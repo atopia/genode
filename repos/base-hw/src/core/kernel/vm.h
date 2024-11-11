@@ -38,7 +38,7 @@ class Kernel::Vm : private Kernel::Object, public Cpu_job
 		struct Identity
 		{
 			unsigned const id;
-			void *   const table;
+			void *         table;
 		};
 
 	private:

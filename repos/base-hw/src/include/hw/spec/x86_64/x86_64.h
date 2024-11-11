@@ -24,6 +24,12 @@ namespace Hw {
 	struct Virtualization_support;
 	class Vendor;
 	class Lapic;
+
+	enum Virt_type {
+		VIRT_TYPE_NONE,
+		VIRT_TYPE_VMX,
+		VIRT_TYPE_SVM
+	};
 }
 
 
@@ -318,6 +324,20 @@ struct Hw::Virtualization_support
 			return false;
 
 		return true;
+	}
+
+	static Virt_type virt_type()
+	{
+		static Virt_type virt_type { VIRT_TYPE_NONE };
+
+		if (virt_type == VIRT_TYPE_NONE) {
+			if (Hw::Virtualization_support::has_vmx())
+				virt_type = VIRT_TYPE_VMX;
+			else if (Hw::Virtualization_support::has_svm())
+				virt_type = VIRT_TYPE_SVM;
+		}
+
+		return virt_type;
 	}
 };
 

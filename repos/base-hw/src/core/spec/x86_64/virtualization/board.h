@@ -22,7 +22,6 @@
 #include <cpu.h>
 #include <cpu/vcpu_state_virtualization.h>
 #include <hw/spec/x86_64/x86_64.h>
-#include <spec/x86_64/virtualization/vm_page_table.h>
 #include <spec/x86_64/virtualization/svm.h>
 #include <spec/x86_64/virtualization/vmx.h>
 
