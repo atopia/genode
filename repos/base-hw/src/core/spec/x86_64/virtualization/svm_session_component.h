@@ -32,6 +32,9 @@
 #include <kernel/vm.h>
 #include <trace/source_registry.h>
 
+#include <vmid_allocator.h>
+
+
 namespace Core { class Svm_session_component; }
 
 
@@ -92,6 +95,7 @@ class Core::Svm_session_component
 		Region_map               &_region_map;
 		Hw::Hpt                  &_table;
 		Vm_page_table_array      &_table_array;
+		Vmid_allocator           &_vmid_alloc;
 		Kernel::Vm::Identity      _id;
 		unsigned                  _vcpu_id_alloc { 0 };
 
@@ -109,9 +113,10 @@ class Core::Svm_session_component
 
 	public:
 
-		Svm_session_component(Rpc_entrypoint &, Resources, Label const &,
-		                     Diag, Ram_allocator &ram, Region_map &, unsigned,
-		                     Trace::Source_registry &);
+		Svm_session_component(Vmid_allocator &, Rpc_entrypoint &,
+		                      Resources, Label const &, Diag,
+		                      Ram_allocator &, Region_map &, unsigned,
+		                      Trace::Source_registry &);
 		~Svm_session_component();
 
 

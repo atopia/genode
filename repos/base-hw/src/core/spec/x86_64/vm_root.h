@@ -26,6 +26,8 @@
 #include <virtualization/vmx_session_component.h>
 #include <virtualization/svm_session_component.h>
 
+#include <vmid_allocator.h>
+
 namespace Core { class Vm_root; }
 
 
@@ -36,6 +38,7 @@ class Core::Vm_root : public Root_component<Session_object<Vm_session>>
 		Ram_allocator          &_ram_allocator;
 		Region_map             &_local_rm;
 		Trace::Source_registry &_trace_sources;
+		Vmid_allocator          _vmid_alloc { };
 
 	protected:
 
@@ -64,7 +67,8 @@ class Core::Vm_root : public Root_component<Session_object<Vm_session>>
 			switch (virt_type) {
 			case VIRT_TYPE_SVM:
 				return new (md_alloc())
-					Svm_session_component(*ep(),
+					Svm_session_component(_vmid_alloc,
+					                      *ep(),
 					                      session_resources_from_args(args),
 					                      session_label_from_args(args),
 					                      session_diag_from_args(args),
@@ -72,7 +76,8 @@ class Core::Vm_root : public Root_component<Session_object<Vm_session>>
 					                      _trace_sources);
 			case VIRT_TYPE_VMX:
 				return new (md_alloc())
-					Vmx_session_component(*ep(),
+					Vmx_session_component(_vmid_alloc,
+					                      *ep(),
 					                      session_resources_from_args(args),
 					                      session_label_from_args(args),
 					                      session_diag_from_args(args),

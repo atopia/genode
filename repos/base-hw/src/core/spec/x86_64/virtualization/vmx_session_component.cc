@@ -16,9 +16,6 @@
 #include <util/construct_at.h>
 #include <util/flex_iterator.h>
 
-/* base internal includes */
-#include <base/internal/unmanaged_singleton.h>
-
 /* core includes */
 #include <dataspace_component.h>
 #include <kernel/core_interface.h>
@@ -88,23 +85,6 @@ void * Vmx_session_component::_alloc_table()
 }
 
 
-// FIXME this should go into vm_root and be handed to the XYZ_session_componenent constructor
-using Vmid_allocator = Genode::Bit_allocator<256>;
-
-static Vmid_allocator &alloc()
-{
-	static Vmid_allocator * allocator = nullptr;
-	if (!allocator) {
-		allocator = unmanaged_singleton<Vmid_allocator>();
-
-		/* reserve VM ID 0 for the hypervisor */
-		addr_t id = allocator->alloc();
-		assert (id == 0);
-	}
-	return *allocator;
-}
-
-
 Genode::addr_t Vmx_session_component::_alloc_vcpu_data(Genode::addr_t ds_addr)
 {
 	/*
@@ -146,7 +126,8 @@ Genode::addr_t Vmx_session_component::_alloc_vcpu_data(Genode::addr_t ds_addr)
 }
 
 
-Vmx_session_component::Vmx_session_component(Rpc_entrypoint &ds_ep,
+Vmx_session_component::Vmx_session_component(Vmid_allocator & vmid_alloc,
+                                             Rpc_entrypoint &ds_ep,
                                              Resources resources,
                                              Label const &label,
                                              Diag diag,
@@ -163,7 +144,8 @@ Vmx_session_component::Vmx_session_component(Rpc_entrypoint &ds_ep,
 	_table(*construct_at<Hw::Ept>(_alloc_table())),
 	_table_array(*(new (cma()) Vm_page_table_array([] (void * virt) {
 	                           return (addr_t)cma().phys_addr(virt);}))),
-	_id({(unsigned)alloc().alloc(), cma().phys_addr(&_table)})
+	_vmid_alloc(vmid_alloc),
+	_id({(unsigned)_vmid_alloc.alloc(), cma().phys_addr(&_table)})
 {
 	/* configure managed VM area */
 	_map.add_range(0UL, ~0UL);
@@ -197,7 +179,7 @@ Vmx_session_component::~Vmx_session_component()
 	/* free guest-to-host page tables */
 	destroy(platform().core_mem_alloc(), &_table);
 	destroy(platform().core_mem_alloc(), &_table_array);
-	alloc().free(_id.id);
+	_vmid_alloc.free(_id.id);
 }
 
 
