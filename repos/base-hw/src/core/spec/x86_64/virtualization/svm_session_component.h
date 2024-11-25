@@ -16,7 +16,6 @@
 
 /* base includes */
 #include <base/allocator.h>
-#include <base/allocator_avl.h>
 #include <base/session_object.h>
 #include <vm_session/vm_session.h>
 #include <dataspace/capability.h>
@@ -33,6 +32,7 @@
 #include <trace/source_registry.h>
 
 #include <vmid_allocator.h>
+#include <guest_memory.h>
 
 
 namespace Core { class Svm_session_component; }
@@ -44,8 +44,6 @@ class Core::Svm_session_component
 	public  Region_map_detach
 {
 	private:
-
-		using Avl_region = Allocator_avl_tpl<Rm_region>;
 
 		using Vm_page_table_array =
 			Hw::Hpt::Allocator::Array<Kernel::DEFAULT_TRANSLATION_TABLE_MAX>;
@@ -90,11 +88,10 @@ class Core::Svm_session_component
 
 		Rpc_entrypoint           &_ep;
 		Constrained_ram_allocator _constrained_md_ram_alloc;
-		Sliced_heap               _sliced_heap;
-		Avl_region                _map { &_sliced_heap };
 		Region_map               &_region_map;
 		Hw::Hpt                  &_table;
 		Vm_page_table_array      &_table_array;
+		Guest_memory              _memory;
 		Vmid_allocator           &_vmid_alloc;
 		Kernel::Vm::Identity      _id;
 		unsigned                  _vcpu_id_alloc { 0 };
@@ -103,14 +100,6 @@ class Core::Svm_session_component
 		static size_t _alloc_vcpu_data(Genode::addr_t ds_addr);
 
 		void *_alloc_table();
-		void  _attach(addr_t phys_addr, addr_t vm_addr, size_t size);
-
-		/* helpers for vm_session_common.cc */
-		void _attach_vm_memory(Dataspace_component &, addr_t, Attach_attr);
-		void _detach_vm_memory(addr_t, size_t);
-		void _with_region(addr_t, auto const &);
-
-
 	public:
 
 		Svm_session_component(Vmid_allocator &, Rpc_entrypoint &,

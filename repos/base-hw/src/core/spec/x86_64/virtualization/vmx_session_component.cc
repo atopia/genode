@@ -17,7 +17,6 @@
 #include <util/flex_iterator.h>
 
 /* core includes */
-#include <dataspace_component.h>
 #include <kernel/core_interface.h>
 #include <virtualization/vmx_session_component.h>
 #include <platform.h>
@@ -32,41 +31,8 @@ static Core_mem_allocator & cma() {
 	return static_cast<Core_mem_allocator&>(platform().core_mem_alloc()); }
 
 
-void Vmx_session_component::_attach(addr_t phys_addr, addr_t vm_addr, size_t size)
-{
-	using namespace Hw;
-
-	Page_flags pflags { RW, EXEC, USER, NO_GLOBAL, RAM, CACHED };
-
-	try {
-		_table.insert_translation(vm_addr, phys_addr, size, pflags,
-		                          _table_array.alloc());
-		return;
-	} catch(Hw::Out_of_tables &) {
-		Genode::error("Translation table needs to much RAM");
-	} catch(...) {
-		Genode::error("Invalid mapping ", Genode::Hex(phys_addr), " -> ",
-		              Genode::Hex(vm_addr), " (", size, ")");
-	}
-}
-
-
-void Vmx_session_component::_attach_vm_memory(Dataspace_component &dsc,
-                                              addr_t const vm_addr,
-                                              Attach_attr const attribute)
-{
-	_attach(dsc.phys_addr() + attribute.offset, vm_addr, attribute.size);
-}
-
-
 void Vmx_session_component::attach_pic(addr_t )
 { }
-
-
-void Vmx_session_component::_detach_vm_memory(addr_t vm_addr, size_t size)
-{
-	_table.remove_translation(vm_addr, size, _table_array.alloc());
-}
 
 
 void * Vmx_session_component::_alloc_table()
@@ -139,31 +105,19 @@ Vmx_session_component::Vmx_session_component(Vmid_allocator & vmid_alloc,
 	Session_object(ds_ep, resources, label, diag),
 	_ep(ds_ep),
 	_constrained_md_ram_alloc(ram_alloc, _ram_quota_guard(), _cap_quota_guard()),
-	_sliced_heap(_constrained_md_ram_alloc, region_map),
 	_region_map(region_map),
 	_table(*construct_at<Hw::Ept>(_alloc_table())),
 	_table_array(*(new (cma()) Vm_page_table_array([] (void * virt) {
 	                           return (addr_t)cma().phys_addr(virt);}))),
+	_memory(_constrained_md_ram_alloc, region_map),
 	_vmid_alloc(vmid_alloc),
 	_id({(unsigned)_vmid_alloc.alloc(), cma().phys_addr(&_table)})
 {
-	/* configure managed VM area */
-	_map.add_range(0UL, ~0UL);
 }
 
 
 Vmx_session_component::~Vmx_session_component()
 {
-	/* detach all regions */
-	while (true) {
-		addr_t out_addr = 0;
-
-		if (!_map.any_block_addr(&out_addr))
-			break;
-
-		detach_at(out_addr);
-	}
-
 	/* free region in allocator */
 	for (unsigned i = 0; i < _vcpu_id_alloc; i++) {
 		if (!_vcpus[i].constructed())
@@ -185,8 +139,26 @@ Vmx_session_component::~Vmx_session_component()
 
 void Vmx_session_component::attach(Dataspace_capability const cap,
                                   addr_t const guest_phys,
-                                  Attach_attr attribute)
+                                  Attach_attr attr)
 {
+	bool out_of_tables   = false;
+	bool invalid_mapping = false;
+
+	auto const &map_fn = [&](addr_t vm_addr, addr_t phys_addr, size_t size) {
+		Page_flags const pflags { RW, EXEC, USER, NO_GLOBAL, RAM, CACHED };
+
+		try {
+			_table.insert_translation(vm_addr, phys_addr, size, pflags, _table_array.alloc());
+		} catch(Hw::Out_of_tables &) {
+			Genode::error("Translation table needs to much RAM");
+			out_of_tables = true;
+		} catch(...) {
+			Genode::error("Invalid mapping ", Genode::Hex(phys_addr), " -> ",
+				      Genode::Hex(vm_addr), " (", size, ")");
+			invalid_mapping = true;
+		}
+	};
+
 	if (!cap.valid())
 		throw Invalid_dataspace();
 
@@ -197,148 +169,45 @@ void Vmx_session_component::attach(Dataspace_capability const cap,
 
 		Dataspace_component &dsc = *ptr;
 
-		/* unsupported - deny otherwise arbitrary physical memory can be mapped to a VM */
-		if (dsc.managed())
-			throw Invalid_dataspace();
-
-		if (guest_phys & 0xffful || attribute.offset & 0xffful ||
-		    attribute.size & 0xffful)
-			throw Invalid_dataspace();
-
-		if (!attribute.size) {
-			attribute.size = dsc.size();
-
-			if (attribute.offset < attribute.size)
-				attribute.size -= attribute.offset;
-		}
-
-		if (attribute.size > dsc.size())
-			attribute.size = dsc.size();
-
-		if (attribute.offset >= dsc.size() ||
-		    attribute.offset > dsc.size() - attribute.size)
-			throw Invalid_dataspace();
-
-		using Alloc_error = Range_allocator::Alloc_error;
-
 		Region_map_detach &rm_detach = *this;
 
-		_map.alloc_addr(attribute.size, guest_phys).with_result(
+		Guest_memory::Attach_result result =
+			_memory.attach(rm_detach, dsc, guest_phys, attr, map_fn);
 
-			[&] (void *) {
+		if (out_of_tables)
+			throw Out_of_ram();
 
-				Rm_region::Attr const region_attr
-				{
-					.base  = guest_phys,
-					.size  = attribute.size,
-					.write = dsc.writeable() && attribute.writeable,
-					.exec  = attribute.executable,
-					.off   = attribute.offset,
-					.dma   = false,
-				};
+		if (invalid_mapping)
+			throw Invalid_dataspace();
 
-				/* store attachment info in meta data */
-				try {
-					_map.construct_metadata((void *)guest_phys,
-					                        dsc, rm_detach, region_attr);
-
-				} catch (Allocator_avl_tpl<Rm_region>::Assign_metadata_failed) {
-					error("failed to store attachment info");
-					throw Invalid_dataspace();
-				}
-
-				Rm_region &region = *_map.metadata((void *)guest_phys);
-
-				/* inform dataspace about attachment */
-				dsc.attached_to(region);
-			},
-
-			[&] (Alloc_error error) {
-
-				switch (error) {
-
-				case Alloc_error::OUT_OF_RAM:  throw Out_of_ram();
-				case Alloc_error::OUT_OF_CAPS: throw Out_of_caps();
-				case Alloc_error::DENIED:
-					{
-						/*
-						 * Handle attach after partial detach
-						 */
-						Rm_region *region_ptr = _map.metadata((void *)guest_phys);
-						if (!region_ptr)
-							throw Region_conflict();
-
-						Rm_region &region = *region_ptr;
-
-						region.with_dataspace([&] (Dataspace_component &dataspace) {
-							if (!(cap == dataspace.cap()))
-								throw Region_conflict();
-						});
-
-						if (guest_phys < region.base() ||
-						    guest_phys > region.base() + region.size() - 1)
-							throw Region_conflict();
-					}
-				};
-			}
-		);
-
-		/* kernel specific code to attach memory to guest */
-		_attach_vm_memory(dsc, guest_phys, attribute);
+		switch (result) {
+		case Guest_memory::Attach_result::OK             : break;
+		case Guest_memory::Attach_result::INVALID_DS     : throw Invalid_dataspace(); break;
+		case Guest_memory::Attach_result::OUT_OF_RAM     : throw Out_of_ram(); break;
+		case Guest_memory::Attach_result::OUT_OF_CAPS    : throw Out_of_caps(); break;
+		case Guest_memory::Attach_result::REGION_CONFLICT: throw Region_conflict(); break;
+		}
 	});
 }
 
 
 void Vmx_session_component::detach(addr_t guest_phys, size_t size)
 {
-	if (!size || (guest_phys & 0xffful) || (size & 0xffful)) {
-		warning("vm_session: skipping invalid memory detach addr=",
-		        (void *)guest_phys, " size=", (void *)size);
-		return;
-	}
+	auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
+		_table.remove_translation(vm_addr, size, _table_array.alloc());
+	};
 
-	addr_t const guest_phys_end = guest_phys + (size - 1);
-	addr_t       addr           = guest_phys;
-	do {
-		Rm_region *region = _map.metadata((void *)addr);
-
-		/* walk region holes page-by-page */
-		size_t iteration_size = 0x1000;
-
-		if (region) {
-			iteration_size = region->size();
-			detach_at(region->base());
-		}
-
-		if (addr >= guest_phys_end - (iteration_size - 1))
-			break;
-
-		addr += iteration_size;
-	} while (true);
-}
-
-
-void Vmx_session_component::_with_region(addr_t const addr,
-                                        auto const &fn)
-{
-	Rm_region *region = _map.metadata((void *)addr);
-	if (region)
-		fn(*region);
-	else
-		error(__PRETTY_FUNCTION__, " unknown region");
+	_memory.detach(guest_phys, size, unmap_fn);
 }
 
 
 void Vmx_session_component::detach_at(addr_t const addr)
 {
-	_with_region(addr, [&] (Rm_region &region) {
+	auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
+		_table.remove_translation(vm_addr, size, _table_array.alloc());
+	};
 
-		if (!region.reserved())
-			reserve_and_flush(addr);
-
-		/* free the reserved region */
-		_map.free(reinterpret_cast<void *>(region.base()));
-	});
+	_memory.detach_at(addr, unmap_fn);
 }
 
 
@@ -350,18 +219,11 @@ void Vmx_session_component::unmap_region(addr_t base, size_t size)
 
 void Vmx_session_component::reserve_and_flush(addr_t const addr)
 {
-	_with_region(addr, [&] (Rm_region &region) {
+	auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
+		_table.remove_translation(vm_addr, size, _table_array.alloc());
+	};
 
-		/* inform dataspace */
-		region.with_dataspace([&] (Dataspace_component &dataspace) {
-			dataspace.detached_from(region);
-		});
-
-		region.mark_as_reserved();
-
-		/* kernel specific code to detach memory from guest */
-		_detach_vm_memory(region.base(), region.size());
-	});
+	_memory.reserve_and_flush(addr, unmap_fn);
 }
 
 
