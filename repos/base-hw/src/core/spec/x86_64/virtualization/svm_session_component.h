@@ -31,6 +31,7 @@
 #include <kernel/vm.h>
 #include <trace/source_registry.h>
 
+#include <vcpu.h>
 #include <vmid_allocator.h>
 #include <guest_memory.h>
 
@@ -55,36 +56,7 @@ class Core::Svm_session_component
 		Svm_session_component(Svm_session_component const &);
 		Svm_session_component &operator = (Svm_session_component const &);
 
-		struct Vcpu : public Rpc_object<Vm_session::Native_vcpu, Vcpu>
-		{
-			Kernel::Vm::Identity      &id;
-			Rpc_entrypoint            &ep;
-			Ram_dataspace_capability   ds_cap   { };
-			addr_t                     ds_addr  { };
-			Kernel_object<Kernel::Vm>  kobj     { };
-			Affinity::Location         location { };
-
-			Vcpu(Kernel::Vm::Identity &id, Rpc_entrypoint &ep) : id(id), ep(ep)
-			{
-				ep.manage(this);
-			}
-
-			~Vcpu()
-			{
-				ep.dissolve(this);
-			}
-
-			/*******************************
-			 ** Native_vcpu RPC interface **
-			 *******************************/
-
-			Capability<Dataspace>   state() const { return ds_cap; }
-			Native_capability native_vcpu()       { return kobj.cap(); }
-
-			void exception_handler(Signal_context_capability);
-		};
-
-		Constructible<Vcpu>       _vcpus[Board::VCPU_MAX];
+		Constructible<Core::Vcpu>       _vcpus[Board::VCPU_MAX];
 
 		Rpc_entrypoint           &_ep;
 		Constrained_ram_allocator _constrained_md_ram_alloc;

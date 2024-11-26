@@ -272,24 +272,5 @@ Capability<Vm_session::Native_vcpu> Svm_session_component::create_vcpu(Thread_ca
 
 
 size_t Svm_session_component::_ds_size() {
-	return align_addr(sizeof(Board::Vcpu_state), get_page_size_log2()); }
-
-
-void Svm_session_component::Vcpu::exception_handler(Signal_context_capability handler)
-{
-	using Genode::warning;
-	if (!handler.valid()) {
-		warning("invalid signal");
-		return;
-	}
-
-	if (kobj.constructed()) {
-		warning("Cannot register vcpu handler twice");
-		return;
-	}
-
-	unsigned const cpu = location.xpos();
-
-	if (!kobj.create(cpu, (void *)ds_addr, Capability_space::capid(handler), id))
-		warning("Cannot instantiate vm kernel object, invalid signal context?");
+	return align_addr(sizeof(Board::Vcpu_state), get_page_size_log2());
 }
