@@ -38,6 +38,7 @@ class Core::Vm_root : public Root_component<Session_object<Vm_session>>
 		Ram_allocator          &_ram_allocator;
 		Region_map             &_local_rm;
 		Trace::Source_registry &_trace_sources;
+		Ram_allocator          &_core_ram_alloc;
 		Vmid_allocator          _vmid_alloc { };
 
 	protected:
@@ -64,17 +65,31 @@ class Core::Vm_root : public Root_component<Session_object<Vm_session>>
 				/* clamp priority value to valid range */
 				priority = min((unsigned)Cpu_session::PRIORITY_LIMIT - 1, priority);
 			}
+
+			Session::Resources resources = session_resources_from_args(args);
+
 			switch (virt_type) {
 			case VIRT_TYPE_SVM:
+				if (resources.ram_quota.value < Svm_session_component::CORE_MEM_SIZE)
+					throw Out_of_ram();
+
+				resources.ram_quota.value -= Svm_session_component::CORE_MEM_SIZE;
+
 				return new (md_alloc())
 					Svm_session_component(_vmid_alloc,
 					                      *ep(),
-					                      session_resources_from_args(args),
+					                      resources,
 					                      session_label_from_args(args),
 					                      session_diag_from_args(args),
 					                      _ram_allocator, _local_rm, priority,
-					                      _trace_sources);
+					                      _trace_sources,
+					                      _core_ram_alloc);
 			case VIRT_TYPE_VMX:
+				if (resources.ram_quota.value < Vmx_session_component::CORE_MEM_SIZE)
+					throw Out_of_ram();
+
+				resources.ram_quota.value -= Vmx_session_component::CORE_MEM_SIZE;
+
 				return new (md_alloc())
 					Vmx_session_component(_vmid_alloc,
 					                      *ep(),
@@ -82,7 +97,8 @@ class Core::Vm_root : public Root_component<Session_object<Vm_session>>
 					                      session_label_from_args(args),
 					                      session_diag_from_args(args),
 					                      _ram_allocator, _local_rm, priority,
-					                      _trace_sources);
+					                      _trace_sources,
+					                      _core_ram_alloc);
 			default:
 				Genode::error( "No virtualization support detected.");
 				throw Core::Service_denied();
@@ -107,12 +123,14 @@ class Core::Vm_root : public Root_component<Session_object<Vm_session>>
 		        Allocator              &md_alloc,
 		        Ram_allocator          &ram_alloc,
 		        Region_map             &local_rm,
-		        Trace::Source_registry &trace_sources)
+		        Trace::Source_registry &trace_sources,
+		        Ram_allocator          &core_ram_alloc)
 		:
 			Root_component<Session_object<Vm_session>>(&session_ep, &md_alloc),
 			_ram_allocator(ram_alloc),
 			_local_rm(local_rm),
-			_trace_sources(trace_sources)
+			_trace_sources(trace_sources),
+			_core_ram_alloc(core_ram_alloc)
 		{ }
 };
 

@@ -35,22 +35,6 @@ void Vmx_session_component::attach_pic(addr_t )
 { }
 
 
-void * Vmx_session_component::_alloc_table()
-{
-	/* get some aligned space for the translation table */
-	return cma().alloc_aligned(sizeof(Hw::Ept),
-	                           Hw::Ept::ALIGNM_LOG2).convert<void *>(
-		[&] (void *table_ptr) {
-			return table_ptr; },
-
-		[&] (Range_allocator::Alloc_error) -> void * {
-			/* XXX handle individual error conditions */
-			error("failed to allocate kernel object");
-			throw Insufficient_ram_quota(); }
-	);
-}
-
-
 Genode::addr_t Vmx_session_component::_alloc_vcpu_data(Genode::addr_t ds_addr)
 {
 	/*
@@ -100,18 +84,24 @@ Vmx_session_component::Vmx_session_component(Vmid_allocator & vmid_alloc,
                                              Ram_allocator &ram_alloc,
                                              Region_map &region_map,
                                              unsigned,
-                                             Trace::Source_registry &)
+                                             Trace::Source_registry &,
+                                             Ram_allocator &core_ram_alloc)
 :
 	Session_object(ds_ep, resources, label, diag),
 	_ep(ds_ep),
 	_constrained_md_ram_alloc(ram_alloc, _ram_quota_guard(), _cap_quota_guard()),
+	_core_ram_alloc(core_ram_alloc),
 	_region_map(region_map),
-	_table(*construct_at<Hw::Ept>(_alloc_table())),
-	_table_array(*(new (cma()) Vm_page_table_array([] (void * virt) {
-	                           return (addr_t)cma().phys_addr(virt);}))),
+	_table(_ep, _core_ram_alloc, _region_map),
+	_table_array(_ep, _core_ram_alloc, _region_map,
+			[] (Phys_allocated<Vm_page_table_array> &table_array, auto *obj_ptr) {
+				construct_at<Vm_page_table_array>(obj_ptr, [&] (void *virt) {
+				return table_array.phys_addr() + ((addr_t) obj_ptr - (addr_t)virt);
+				});
+			}),
 	_memory(_constrained_md_ram_alloc, region_map),
 	_vmid_alloc(vmid_alloc),
-	_id({(unsigned)_vmid_alloc.alloc(), cma().phys_addr(&_table)})
+	_id({(unsigned)_vmid_alloc.alloc(), (void *)_table.phys_addr()})
 {
 }
 
@@ -130,9 +120,6 @@ Vmx_session_component::~Vmx_session_component()
 		}
 	}
 
-	/* free guest-to-host page tables */
-	destroy(platform().core_mem_alloc(), &_table);
-	destroy(platform().core_mem_alloc(), &_table_array);
 	_vmid_alloc.free(_id.id);
 }
 
@@ -148,7 +135,7 @@ void Vmx_session_component::attach(Dataspace_capability const cap,
 		Page_flags const pflags { RW, EXEC, USER, NO_GLOBAL, RAM, CACHED };
 
 		try {
-			_table.insert_translation(vm_addr, phys_addr, size, pflags, _table_array.alloc());
+			_table.obj.insert_translation(vm_addr, phys_addr, size, pflags, _table_array.obj.alloc());
 		} catch(Hw::Out_of_tables &) {
 			Genode::error("Translation table needs to much RAM");
 			out_of_tables = true;
@@ -194,7 +181,7 @@ void Vmx_session_component::attach(Dataspace_capability const cap,
 void Vmx_session_component::detach(addr_t guest_phys, size_t size)
 {
 	auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
-		_table.remove_translation(vm_addr, size, _table_array.alloc());
+		_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc());
 	};
 
 	_memory.detach(guest_phys, size, unmap_fn);
@@ -204,7 +191,7 @@ void Vmx_session_component::detach(addr_t guest_phys, size_t size)
 void Vmx_session_component::detach_at(addr_t const addr)
 {
 	auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
-		_table.remove_translation(vm_addr, size, _table_array.alloc());
+		_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc());
 	};
 
 	_memory.detach_at(addr, unmap_fn);
@@ -220,7 +207,7 @@ void Vmx_session_component::unmap_region(addr_t base, size_t size)
 void Vmx_session_component::reserve_and_flush(addr_t const addr)
 {
 	auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
-		_table.remove_translation(vm_addr, size, _table_array.alloc());
+		_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc());
 	};
 
 	_memory.reserve_and_flush(addr, unmap_fn);

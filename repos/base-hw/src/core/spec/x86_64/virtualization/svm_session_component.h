@@ -34,6 +34,7 @@
 #include <vcpu.h>
 #include <vmid_allocator.h>
 #include <guest_memory.h>
+#include <phys_allocated.h>
 
 
 namespace Core { class Svm_session_component; }
@@ -42,12 +43,14 @@ namespace Core { class Svm_session_component; }
 class Core::Svm_session_component
 :
 	public Session_object<Vm_session>,
-	public  Region_map_detach
+	public Region_map_detach
 {
 	private:
 
+		using Vm_page_table = Hw::Hpt;
+
 		using Vm_page_table_array =
-			Hw::Hpt::Allocator::Array<Kernel::DEFAULT_TRANSLATION_TABLE_MAX>;
+			Vm_page_table::Allocator::Array<Kernel::DEFAULT_TRANSLATION_TABLE_MAX>;
 
 
 		/*
@@ -58,17 +61,18 @@ class Core::Svm_session_component
 
 		Constructible<Core::Vcpu>       _vcpus[Board::VCPU_MAX];
 
-		Rpc_entrypoint           &_ep;
-		Constrained_ram_allocator _constrained_md_ram_alloc;
-		Region_map               &_region_map;
-		Hw::Hpt                  &_table;
-		Vm_page_table_array      &_table_array;
-		Guest_memory              _memory;
-		Vmid_allocator           &_vmid_alloc;
-		Kernel::Vm::Identity      _id;
-		unsigned                  _vcpu_id_alloc { 0 };
+		Rpc_entrypoint                     &_ep;
+		Constrained_ram_allocator           _constrained_md_ram_alloc;
+		Ram_allocator                      &_core_ram_alloc;
+		Region_map                         &_region_map;
+		Phys_allocated<Vm_page_table>       _table;
+		Phys_allocated<Vm_page_table_array> _table_array;
+		Guest_memory                        _memory;
+		Vmid_allocator                     &_vmid_alloc;
+		Kernel::Vm::Identity                _id;
+		unsigned                            _vcpu_id_alloc { 0 };
 
-		static size_t _ds_size();
+		size_t _ds_size();
 		static size_t _alloc_vcpu_data(Genode::addr_t ds_addr);
 
 		void *_alloc_table();
@@ -77,7 +81,8 @@ class Core::Svm_session_component
 		Svm_session_component(Vmid_allocator &, Rpc_entrypoint &,
 		                      Resources, Label const &, Diag,
 		                      Ram_allocator &, Region_map &, unsigned,
-		                      Trace::Source_registry &);
+		                      Trace::Source_registry &,
+		                      Ram_allocator &);
 		~Svm_session_component();
 
 
@@ -99,6 +104,8 @@ class Core::Svm_session_component
 		void detach(addr_t, size_t) override;
 
 		Capability<Native_vcpu> create_vcpu(Thread_capability) override;
+
+		static constexpr size_t CORE_MEM_SIZE { sizeof(Vm_page_table) + sizeof(Vm_page_table_array) };
 };
 
 #endif /* _CORE__SVM_VM_SESSION_COMPONENT_H_ */

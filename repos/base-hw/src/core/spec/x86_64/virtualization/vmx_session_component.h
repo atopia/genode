@@ -34,6 +34,7 @@
 #include <vcpu.h>
 #include <vmid_allocator.h>
 #include <guest_memory.h>
+#include <phys_allocated.h>
 
 
 namespace Core { class Vmx_session_component; }
@@ -46,8 +47,10 @@ class Core::Vmx_session_component
 {
 	private:
 
+		using Vm_page_table = Hw::Ept;
+
 		using Vm_page_table_array =
-			Hw::Ept::Allocator::Array<Kernel::DEFAULT_TRANSLATION_TABLE_MAX>;
+			Vm_page_table::Allocator::Array<Kernel::DEFAULT_TRANSLATION_TABLE_MAX>;
 
 
 		/*
@@ -58,15 +61,16 @@ class Core::Vmx_session_component
 
 		Constructible<Core::Vcpu>       _vcpus[Board::VCPU_MAX];
 
-		Rpc_entrypoint           &_ep;
-		Constrained_ram_allocator _constrained_md_ram_alloc;
-		Region_map               &_region_map;
-		Hw::Ept                  &_table;
-		Vm_page_table_array      &_table_array;
-		Guest_memory              _memory;
-		Vmid_allocator           &_vmid_alloc;
-		Kernel::Vm::Identity      _id;
-		unsigned                  _vcpu_id_alloc { 0 };
+		Rpc_entrypoint                     &_ep;
+		Constrained_ram_allocator           _constrained_md_ram_alloc;
+		Ram_allocator                      &_core_ram_alloc;
+		Region_map                         &_region_map;
+		Phys_allocated<Vm_page_table>       _table;
+		Phys_allocated<Vm_page_table_array> _table_array;
+		Guest_memory                        _memory;
+		Vmid_allocator                     &_vmid_alloc;
+		Kernel::Vm::Identity                _id;
+		unsigned                            _vcpu_id_alloc { 0 };
 
 		static size_t _ds_size();
 		// FIXME dosn't need to be static
@@ -78,7 +82,8 @@ class Core::Vmx_session_component
 		Vmx_session_component(Vmid_allocator &, Rpc_entrypoint &,
 		                      Resources, Label const &, Diag,
 		                      Ram_allocator &, Region_map &, unsigned,
-		                      Trace::Source_registry &);
+		                      Trace::Source_registry &,
+		                      Ram_allocator &);
 		~Vmx_session_component();
 
 
@@ -100,6 +105,8 @@ class Core::Vmx_session_component
 		void detach(addr_t, size_t) override;
 
 		Capability<Native_vcpu> create_vcpu(Thread_capability) override;
+
+		static constexpr size_t CORE_MEM_SIZE { sizeof(Vm_page_table) + sizeof(Vm_page_table_array) };
 };
 
 #endif /* _CORE__VMX_VM_SESSION_COMPONENT_H_ */
