@@ -43,7 +43,7 @@ namespace Core { class Vmx_session_component; }
 class Core::Vmx_session_component
 :
 	public Session_object<Vm_session>,
-	public  Region_map_detach
+	public Region_map_detach
 {
 	private:
 
@@ -71,10 +71,6 @@ class Core::Vmx_session_component
 		Vmid_allocator                     &_vmid_alloc;
 		Kernel::Vm::Identity                _id;
 		unsigned                            _vcpu_id_alloc { 0 };
-
-		static size_t _ds_size();
-		// FIXME dosn't need to be static
-		static size_t _alloc_vcpu_data(Genode::addr_t ds_addr);
 
 	public:
 

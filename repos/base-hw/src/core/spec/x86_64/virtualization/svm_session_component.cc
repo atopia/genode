@@ -27,53 +27,8 @@ using namespace Core;
 
 
 
-static Core_mem_allocator & cma() {
-	return static_cast<Core_mem_allocator&>(platform().core_mem_alloc()); }
-
-
 void Svm_session_component::attach_pic(addr_t )
 { }
-
-
-Genode::addr_t Svm_session_component::_alloc_vcpu_data(Genode::addr_t ds_addr)
-{
-	/*
-	 * XXX these allocations currently leak memory on VM Session
-	 * destruction. This cannot be easily fixed because the
-	 * Core Mem Allocator does not implement free().
-	 *
-	 * Normally we would use constrained_md_ram_alloc to make the allocation,
-	 * but to get the physical address of the pages in virt_area, we need
-	 * to use the Core Mem Allocator.
-	 */
-
-	using Genode::error;
-
-	Vcpu_data * vcpu_data = (Vcpu_data *) cma()
-	                        .try_alloc(sizeof(Board::Vcpu_data))
-	                        .convert<void *>(
-	                                [&](void *ptr) { return ptr; },
-	                                [&](Range_allocator::Alloc_error) -> void * {
-	                                        /* XXX handle individual error conditions */
-	                                        error("failed to allocate kernel object");
-	                                        throw Insufficient_ram_quota();
-	                                });
-
-	vcpu_data->virt_area = cma()
-	                       .alloc_aligned(Vcpu_data::size(), 12)
-	                       .convert<void *>(
-	                                [&](void *ptr) { return ptr; },
-	                                [&](Range_allocator::Alloc_error) -> void * {
-	                                        /* XXX handle individual error conditions */
-	                                        error("failed to allocate kernel object");
-	                                        throw Insufficient_ram_quota();
-	                                });
-
-	vcpu_data->vcpu_state = (Vcpu_state *) ds_addr;
-	vcpu_data->phys_addr  = (addr_t)cma().phys_addr(vcpu_data->virt_area);
-
-	return (Genode::addr_t) vcpu_data;
-}
 
 
 Svm_session_component::Svm_session_component(Vmid_allocator & vmid_alloc,
@@ -108,17 +63,8 @@ Svm_session_component::Svm_session_component(Vmid_allocator & vmid_alloc,
 
 Svm_session_component::~Svm_session_component()
 {
-	/* free region in allocator */
-	for (unsigned i = 0; i < _vcpu_id_alloc; i++) {
-		if (!_vcpus[i].constructed())
-			continue;
-
-		Vcpu & vcpu = *_vcpus[i];
-		if (vcpu.ds_cap.valid()) {
-			_region_map.detach(vcpu.ds_addr);
-			_constrained_md_ram_alloc.free(vcpu.ds_cap);
-		}
-	}
+	for (unsigned i = 0; i < _vcpu_id_alloc; i++)
+		_vcpus[i].destruct();
 
 	_vmid_alloc.free(_id.id);
 }
@@ -227,37 +173,18 @@ Capability<Vm_session::Native_vcpu> Svm_session_component::create_vcpu(Thread_ca
 	if (_vcpus[_vcpu_id_alloc].constructed())
 		return { };
 
-	_vcpus[_vcpu_id_alloc].construct(_id, _ep);
+	if (!try_withdraw(Ram_quota{Vcpu_data::size()}))
+		return { };
+
+	_vcpus[_vcpu_id_alloc].construct(_id,
+	                                 _ep,
+	                                 _core_ram_alloc,
+	                                 _constrained_md_ram_alloc,
+	                                 _region_map,
+	                                 vcpu_location);
+
 	Vcpu & vcpu = *_vcpus[_vcpu_id_alloc];
-
-	try {
-		vcpu.ds_cap = _constrained_md_ram_alloc.alloc(_ds_size(), Cache::UNCACHED);
-
-		Region_map::Attr attr { };
-		attr.writeable = true;
-		vcpu.ds_addr = _region_map.attach(vcpu.ds_cap, attr).convert<addr_t>(
-			[&] (Region_map::Range range) { return _alloc_vcpu_data(range.start); },
-			[&] (Region_map::Attach_error) -> addr_t {
-				error("failed to attach VCPU data within core");
-				if (vcpu.ds_cap.valid())
-					_constrained_md_ram_alloc.free(vcpu.ds_cap);
-				_vcpus[_vcpu_id_alloc].destruct();
-				return 0;
-			});
-	} catch (...) {
-		if (vcpu.ds_cap.valid())
-			_constrained_md_ram_alloc.free(vcpu.ds_cap);
-		_vcpus[_vcpu_id_alloc].destruct();
-		throw;
-	}
-
-	vcpu.location = vcpu_location;
 
 	_vcpu_id_alloc ++;
 	return vcpu.cap();
-}
-
-
-size_t Svm_session_component::_ds_size() {
-	return align_addr(sizeof(Board::Vcpu_state), get_page_size_log2());
 }
