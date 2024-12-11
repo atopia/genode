@@ -76,7 +76,6 @@ class Core::Vmx_session_component
 		// FIXME dosn't need to be static
 		static size_t _alloc_vcpu_data(Genode::addr_t ds_addr);
 
-		void *_alloc_table();
 	public:
 
 		Vmx_session_component(Vmid_allocator &, Rpc_entrypoint &,
