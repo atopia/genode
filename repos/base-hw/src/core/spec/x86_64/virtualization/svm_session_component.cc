@@ -125,8 +125,8 @@ Svm_session_component::~Svm_session_component()
 
 
 void Svm_session_component::attach(Dataspace_capability const cap,
-                                  addr_t const guest_phys,
-                                  Attach_attr attr)
+                                   addr_t const guest_phys,
+                                   Attach_attr attr)
 {
 	bool out_of_tables   = false;
 	bool invalid_mapping = false;
