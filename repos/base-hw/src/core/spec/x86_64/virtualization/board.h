@@ -33,10 +33,6 @@ namespace Board {
 	using Vcpu_data = Genode::Vcpu_data;
 	using Vcpu_state = Genode::Vcpu_state;
 
-	enum {
-		VCPU_MAX = 16
-	};
-
 	enum Platform_exitcodes : uint64_t {
 		EXIT_NPF     = 0xfc,
 		EXIT_INIT    = 0xfd,

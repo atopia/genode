@@ -17,6 +17,7 @@
 /* base includes */
 #include <base/allocator.h>
 #include <base/session_object.h>
+#include <base/registry.h>
 #include <vm_session/vm_session.h>
 #include <dataspace/capability.h>
 
@@ -59,18 +60,18 @@ class Core::Svm_session_component
 		Svm_session_component(Svm_session_component const &);
 		Svm_session_component &operator = (Svm_session_component const &);
 
-		Constructible<Core::Vcpu>       _vcpus[Board::VCPU_MAX];
+		Registry<Registered<Vcpu>>          _vcpus { };
 
 		Rpc_entrypoint                     &_ep;
 		Constrained_ram_allocator           _constrained_md_ram_alloc;
 		Ram_allocator                      &_core_ram_alloc;
 		Region_map                         &_region_map;
+		Heap                                _heap;
 		Phys_allocated<Vm_page_table>       _table;
 		Phys_allocated<Vm_page_table_array> _table_array;
 		Guest_memory                        _memory;
 		Vmid_allocator                     &_vmid_alloc;
 		Kernel::Vm::Identity                _id;
-		unsigned                            _vcpu_id_alloc { 0 };
 
 	public:
 

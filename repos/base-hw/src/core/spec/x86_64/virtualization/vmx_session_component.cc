@@ -47,6 +47,7 @@ Vmx_session_component::Vmx_session_component(Vmid_allocator & vmid_alloc,
 	_constrained_md_ram_alloc(ram_alloc, _ram_quota_guard(), _cap_quota_guard()),
 	_core_ram_alloc(core_ram_alloc),
 	_region_map(region_map),
+	_heap(_constrained_md_ram_alloc, region_map),
 	_table(_ep, _core_ram_alloc, _region_map),
 	_table_array(_ep, _core_ram_alloc, _region_map,
 			[] (Phys_allocated<Vm_page_table_array> &table_array, auto *obj_ptr) {
@@ -63,8 +64,8 @@ Vmx_session_component::Vmx_session_component(Vmid_allocator & vmid_alloc,
 
 Vmx_session_component::~Vmx_session_component()
 {
-	for (unsigned i = 0; i < _vcpu_id_alloc; i++)
-		_vcpus[i].destruct();
+	_vcpus.for_each([&] (Registered<Vcpu> &vcpu) {
+		destroy(_heap, &vcpu); });
 
 	_vmid_alloc.free(_id.id);
 }
@@ -162,7 +163,8 @@ void Vmx_session_component::reserve_and_flush(addr_t const addr)
 
 Capability<Vm_session::Native_vcpu> Vmx_session_component::create_vcpu(Thread_capability const tcap)
 {
-	if (_vcpu_id_alloc == Board::VCPU_MAX) return { };
+	if (!try_withdraw(Ram_quota{Vcpu_data::size()}))
+		return { };
 
 	Affinity::Location vcpu_location;
 	_ep.apply(tcap, [&] (Cpu_thread_component *ptr) {
@@ -170,21 +172,14 @@ Capability<Vm_session::Native_vcpu> Vmx_session_component::create_vcpu(Thread_ca
 		vcpu_location = ptr->platform_thread().affinity();
 	});
 
-	if (_vcpus[_vcpu_id_alloc].constructed())
-		return { };
+	Vcpu &vcpu = *new (_heap)
+				Registered<Vcpu>(_vcpus,
+				                 _id,
+	                                         _ep,
+	                                         _core_ram_alloc,
+	                                         _constrained_md_ram_alloc,
+	                                         _region_map,
+	                                         vcpu_location);
 
-	if (!try_withdraw(Ram_quota{Vcpu_data::size()}))
-		return { };
-
-	_vcpus[_vcpu_id_alloc].construct(_id,
-	                                 _ep,
-	                                 _core_ram_alloc,
-	                                 _constrained_md_ram_alloc,
-	                                 _region_map,
-	                                 vcpu_location);
-
-	Vcpu & vcpu = *_vcpus[_vcpu_id_alloc];
-
-	_vcpu_id_alloc ++;
 	return vcpu.cap();
 }
