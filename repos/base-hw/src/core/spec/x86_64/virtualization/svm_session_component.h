@@ -72,8 +72,6 @@ class Core::Svm_session_component
 		Kernel::Vm::Identity                _id;
 		unsigned                            _vcpu_id_alloc { 0 };
 
-		size_t _ds_size();
-
 	public:
 
 		Svm_session_component(Vmid_allocator &, Rpc_entrypoint &,
