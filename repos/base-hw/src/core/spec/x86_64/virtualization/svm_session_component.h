@@ -91,20 +91,15 @@ class Core::Svm_session_component
 
 		void _detach_at(addr_t addr)
 		{
-			auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
-				_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc());
-			};
-
-			_memory.detach_at(addr, unmap_fn);
+			_memory.detach_at(addr,
+				[&](addr_t vm_addr, size_t size) {
+				_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc()); });
 		}
 
 		void _reserve_and_flush(addr_t addr)
 		{
-			auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
-				_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc());
-			};
-
-			_memory.reserve_and_flush(addr, unmap_fn);
+			_memory.reserve_and_flush(addr, [&](addr_t vm_addr, size_t size) {
+				_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc()); });
 		}
 
 	public:
@@ -205,11 +200,8 @@ class Core::Svm_session_component
 
 		void detach(addr_t guest_phys, size_t size) override
 		{
-			auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
-				_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc());
-			};
-
-			_memory.detach(guest_phys, size, unmap_fn);
+			_memory.detach(guest_phys, size, [&](addr_t vm_addr, size_t size) {
+				_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc()); });
 		}
 
 		Capability<Native_vcpu> create_vcpu(Thread_capability tcap) override
