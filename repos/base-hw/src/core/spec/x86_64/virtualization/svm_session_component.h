@@ -27,6 +27,7 @@
 #include <spec/x86_64/virtualization/hpt.h>
 
 /* core includes */
+#include <cpu_thread_component.h>
 #include <object.h>
 #include <region_map_component.h>
 #include <kernel/vm.h>
@@ -75,32 +76,163 @@ class Core::Svm_session_component
 
 	public:
 
-		Svm_session_component(Vmid_allocator &, Rpc_entrypoint &,
-		                      Resources, Label const &, Diag,
-		                      Ram_allocator &, Region_map &, unsigned,
+		Svm_session_component(Vmid_allocator & vmid_alloc,
+		                      Rpc_entrypoint &ds_ep,
+		                      Resources resources,
+		                      Label const &label,
+		                      Diag diag,
+		                      Ram_allocator &ram_alloc,
+		                      Region_map &region_map,
+		                      unsigned,
 		                      Trace::Source_registry &,
-		                      Ram_allocator &);
-		~Svm_session_component();
+		                      Ram_allocator &core_ram_alloc)
+		:
+			Session_object(ds_ep, resources, label, diag),
+			_ep(ds_ep),
+			_constrained_md_ram_alloc(ram_alloc, _ram_quota_guard(), _cap_quota_guard()),
+			_core_ram_alloc(core_ram_alloc),
+			_region_map(region_map),
+			_heap(_constrained_md_ram_alloc, region_map),
+			_table(_ep, _core_ram_alloc, _region_map),
+			_table_array(_ep, _core_ram_alloc, _region_map,
+					[] (Phys_allocated<Vm_page_table_array> &table_array, auto *obj_ptr) {
+						construct_at<Vm_page_table_array>(obj_ptr, [&] (void *virt) {
+						return table_array.phys_addr() + ((addr_t) obj_ptr - (addr_t)virt);
+						});
+					}),
+			_memory(_constrained_md_ram_alloc, region_map),
+			_vmid_alloc(vmid_alloc),
+			_id({(unsigned)_vmid_alloc.alloc(), (void *)_table.phys_addr()})
+		{ }
+
+		~Svm_session_component()
+		{
+			_vcpus.for_each([&] (Registered<Vcpu> &vcpu) {
+				destroy(_heap, &vcpu); });
+
+			_vmid_alloc.free(_id.id);
+		}
 
 
 		/*********************************
 		 ** Region_map_detach interface **
 		 *********************************/
 
-		void detach_at         (addr_t)         override;
-		void unmap_region      (addr_t, size_t) override;
-		void reserve_and_flush (addr_t)         override;
+		void detach_at(addr_t addr) override
+		{
+			auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
+				_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc());
+			};
+
+			_memory.detach_at(addr, unmap_fn);
+		}
+
+		void unmap_region(addr_t base, size_t size) override
+		{
+			error(__func__, " unimplemented ", base, " ", size);
+		}
+
+		void reserve_and_flush(addr_t addr) override
+		{
+			auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
+				_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc());
+			};
+
+			_memory.reserve_and_flush(addr, unmap_fn);
+		}
+
 
 
 		/**************************
 		 ** Vm session interface **
 		 **************************/
 
-		void attach(Dataspace_capability, addr_t, Attach_attr) override;
-		void attach_pic(addr_t) override;
-		void detach(addr_t, size_t) override;
+		void attach(Dataspace_capability cap, addr_t guest_phys, Attach_attr attr) override
+		{
+			bool out_of_tables   = false;
+			bool invalid_mapping = false;
 
-		Capability<Native_vcpu> create_vcpu(Thread_capability) override;
+			auto const &map_fn = [&](addr_t vm_addr, addr_t phys_addr, size_t size) {
+				Page_flags const pflags { RW, EXEC, USER, NO_GLOBAL, RAM, CACHED };
+
+				try {
+					_table.obj.insert_translation(vm_addr, phys_addr, size, pflags, _table_array.obj.alloc());
+				} catch(Hw::Out_of_tables &) {
+					Genode::error("Translation table needs to much RAM");
+					out_of_tables = true;
+				} catch(...) {
+					Genode::error("Invalid mapping ", Genode::Hex(phys_addr), " -> ",
+					               Genode::Hex(vm_addr), " (", size, ")");
+					invalid_mapping = true;
+				}
+			};
+
+			if (!cap.valid())
+				throw Invalid_dataspace();
+
+			/* check dataspace validity */
+			_ep.apply(cap, [&] (Dataspace_component *ptr) {
+				if (!ptr)
+					throw Invalid_dataspace();
+
+				Dataspace_component &dsc = *ptr;
+
+				Region_map_detach &rm_detach = *this;
+
+				Guest_memory::Attach_result result =
+					_memory.attach(rm_detach, dsc, guest_phys, attr, map_fn);
+
+				if (out_of_tables)
+					throw Out_of_ram();
+
+				if (invalid_mapping)
+					throw Invalid_dataspace();
+
+				switch (result) {
+				case Guest_memory::Attach_result::OK             : break;
+				case Guest_memory::Attach_result::INVALID_DS     : throw Invalid_dataspace(); break;
+				case Guest_memory::Attach_result::OUT_OF_RAM     : throw Out_of_ram(); break;
+				case Guest_memory::Attach_result::OUT_OF_CAPS    : throw Out_of_caps(); break;
+				case Guest_memory::Attach_result::REGION_CONFLICT: throw Region_conflict(); break;
+				}
+			});
+		}
+
+		void attach_pic(addr_t) override
+		{ }
+
+		void detach(addr_t guest_phys, size_t size) override
+		{
+			auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
+				_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc());
+			};
+
+			_memory.detach(guest_phys, size, unmap_fn);
+		}
+
+		Capability<Native_vcpu> create_vcpu(Thread_capability tcap) override
+		{
+			if (!try_withdraw(Ram_quota{Vcpu_data::size()}))
+				return { };
+
+			Affinity::Location vcpu_location;
+			_ep.apply(tcap, [&] (Cpu_thread_component *ptr) {
+				if (!ptr) return;
+				vcpu_location = ptr->platform_thread().affinity();
+			});
+
+			Vcpu &vcpu = *new (_heap)
+						Registered<Vcpu>(_vcpus,
+			                                         _id,
+			                                         _ep,
+			                                         _core_ram_alloc,
+			                                         _constrained_md_ram_alloc,
+			                                         _region_map,
+			                                         vcpu_location);
+
+			return vcpu.cap();
+		}
+
 
 		static constexpr size_t CORE_MEM_SIZE { sizeof(Vm_page_table) + sizeof(Vm_page_table_array) };
 };
