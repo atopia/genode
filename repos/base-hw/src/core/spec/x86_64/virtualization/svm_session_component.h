@@ -44,8 +44,7 @@ namespace Core { class Svm_session_component; }
 
 class Core::Svm_session_component
 :
-	public Session_object<Vm_session>,
-	public Region_map_detach
+	public Session_object<Vm_session>
 {
 	private:
 
@@ -61,6 +60,22 @@ class Core::Svm_session_component
 		Svm_session_component(Svm_session_component const &);
 		Svm_session_component &operator = (Svm_session_component const &);
 
+		struct Detach : Region_map_detach
+		{
+			Svm_session_component &_session;
+
+			Detach(Svm_session_component &session) : _session(session)
+			{ }
+
+			void detach_at(addr_t at) override { _session._detach_at(at); }
+			void reserve_and_flush(addr_t at) override { _session._reserve_and_flush(at); }
+
+			void unmap_region(addr_t base, size_t size) override
+			{
+				Genode::error(__func__, " unimplemented ", base, " ", size);
+			}
+		} _detach { *this };
+
 		Registry<Registered<Vcpu>>          _vcpus { };
 
 		Rpc_entrypoint                     &_ep;
@@ -73,6 +88,24 @@ class Core::Svm_session_component
 		Guest_memory                        _memory;
 		Vmid_allocator                     &_vmid_alloc;
 		Kernel::Vm::Identity                _id;
+
+		void _detach_at(addr_t addr)
+		{
+			auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
+				_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc());
+			};
+
+			_memory.detach_at(addr, unmap_fn);
+		}
+
+		void _reserve_and_flush(addr_t addr)
+		{
+			auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
+				_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc());
+			};
+
+			_memory.reserve_and_flush(addr, unmap_fn);
+		}
 
 	public:
 
@@ -114,35 +147,6 @@ class Core::Svm_session_component
 		}
 
 
-		/*********************************
-		 ** Region_map_detach interface **
-		 *********************************/
-
-		void detach_at(addr_t addr) override
-		{
-			auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
-				_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc());
-			};
-
-			_memory.detach_at(addr, unmap_fn);
-		}
-
-		void unmap_region(addr_t base, size_t size) override
-		{
-			error(__func__, " unimplemented ", base, " ", size);
-		}
-
-		void reserve_and_flush(addr_t addr) override
-		{
-			auto const &unmap_fn = [&](addr_t vm_addr, size_t size) {
-				_table.obj.remove_translation(vm_addr, size, _table_array.obj.alloc());
-			};
-
-			_memory.reserve_and_flush(addr, unmap_fn);
-		}
-
-
-
 		/**************************
 		 ** Vm session interface **
 		 **************************/
@@ -177,10 +181,8 @@ class Core::Svm_session_component
 
 				Dataspace_component &dsc = *ptr;
 
-				Region_map_detach &rm_detach = *this;
-
 				Guest_memory::Attach_result result =
-					_memory.attach(rm_detach, dsc, guest_phys, attr, map_fn);
+					_memory.attach(_detach, dsc, guest_phys, attr, map_fn);
 
 				if (out_of_tables)
 					throw Out_of_ram();
