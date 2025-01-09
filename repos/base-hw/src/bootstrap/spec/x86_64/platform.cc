@@ -18,6 +18,7 @@
 #include <platform.h>
 #include <multiboot.h>
 #include <multiboot2.h>
+#include <port_io.h>
 
 #include <hw/memory_consts.h>
 #include <hw/spec/x86_64/acpi.h>
@@ -92,6 +93,58 @@ static uint32_t calibrate_tsc_frequency(addr_t fadt_addr)
 	}
 
 	return val;
+}
+
+
+static void calibrate_lapic_frequency(addr_t fadt_addr, uint32_t &ticks_per_ms, uint32_t &div)
+{
+	uint32_t const default_ticks_per_ms = TIMER_MIN_TICKS_PER_MS;
+	uint32_t const sleep_ms = 10;
+
+	if (!fadt_addr) {
+		Genode::error("FADT not found, setting minimum Local APIC frequency");
+		ticks_per_ms = default_ticks_per_ms;
+	}
+
+	Hw::Acpi_fadt fadt(reinterpret_cast<Hw::Acpi_generic *>(fadt_addr));
+
+
+	Hw::Local_apic lapic(Hw::Cpu_memory_map::lapic_phys_base());
+
+	ticks_per_ms = 0;
+
+	lapic.calibrate_divider(ticks_per_ms, div, [&]() {
+			return fadt.calibrate_freq_khz(sleep_ms, [&]() {
+				return lapic.read<Hw::Local_apic::Tmr_current>();;
+		}, true);
+	});
+
+	if (!ticks_per_ms) {
+		Genode::error("Unable to calibrate local APIC, setting minimum frequency");
+		ticks_per_ms = default_ticks_per_ms;
+	}
+}
+
+
+static void disable_pit()
+{
+	using Bootstrap::outb;
+
+	enum {
+		/* PIT constants */
+		PIT_CH0_DATA   = 0x40,
+		PIT_MODE       = 0x43,
+	};
+
+	struct Calibration_failed : Genode::Exception { };
+
+	/**
+	 * Disable PIT timer channel. This is necessary since BIOS sets up
+	 * channel 0 to fire periodically.
+	 */
+	outb(PIT_MODE, 0x30);
+	outb(PIT_CH0_DATA, 0);
+	outb(PIT_CH0_DATA, 0);
 }
 
 
@@ -280,6 +333,9 @@ Bootstrap::Platform::Board::Board()
 	}
 
 	info.tsc_frequency = calibrate_tsc_frequency(info.acpi_fadt);
+	calibrate_lapic_frequency(info.acpi_fadt, info.lapic_ticks_per_ms, info.lapic_div);
+
+	disable_pit();
 
 	/* copy 16 bit boot code for AP CPUs and for ACPI resume */
 	addr_t ap_code_size = (addr_t)&_start - (addr_t)&_ap;
