@@ -58,7 +58,8 @@ Genode::addr_t Vm_session_component::_alloc_vcpu_data(Genode::addr_t ds_addr)
 }
 
 
-Vm_session_component::Vm_session_component(Rpc_entrypoint  &ep,
+Vm_session_component::Vm_session_component(Vmid_allocator &,
+                                           Rpc_entrypoint  &ep,
                                            Resources resources,
                                            Label const &,
                                            Diag,
