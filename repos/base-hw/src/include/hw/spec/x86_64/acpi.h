@@ -256,14 +256,10 @@ struct Hw::Acpi_fadt : Genode::Mmio<276>
 			read<Hw::Acpi_fadt::X_pm_tmr_blk::Addressspace>();
 
 		/* I/O port address, most likely */
-		if (tmr_addr_type == 1) {
-			return inl((uint16_t)tmr_addr);
-		}
+		if (tmr_addr_type == 1) return inl((uint16_t)tmr_addr);
 
 		/* System Memory space address */
-		if (tmr_addr_type == 0) {
-			return *(uint32_t *)tmr_addr;
-		}
+		if (tmr_addr_type == 0) return *(uint32_t *)tmr_addr;
 
 		return 0;
 	}
@@ -274,10 +270,7 @@ struct Hw::Acpi_fadt : Genode::Mmio<276>
 
 		uint32_t initial = read_pm_tmr();
 
-		if (!initial) {
-			Genode::error("Unable to read ACPI timer");
-			return 0;
-		}
+		if (!initial) return 0;
 
 		uint64_t t1 = get_value_fn();
 		while ((read_pm_tmr() - initial) < (acpi_timer_freq * sleep_ms / 1000))

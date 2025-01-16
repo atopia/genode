@@ -73,12 +73,12 @@ static uint32_t calibrate_tsc_frequency(addr_t fadt_addr)
 	const unsigned Tsc_fixed_value = 2400;
 	uint32_t default_freq = Tsc_fixed_value * 1000;
 
-	uint32_t const sleep_ms = 10;
-
 	if (!fadt_addr) {
-		Genode::error("FADT not found, returning default TSC value");
+		warning("FADT not found, returning fixed TSC frequency of ", default_freq, "kHz");
 		return default_freq;
 	}
+
+	uint32_t const sleep_ms = 10;
 
 	Hw::Acpi_fadt fadt(reinterpret_cast<Hw::Acpi_generic *>(fadt_addr));
 
@@ -86,9 +86,8 @@ static uint32_t calibrate_tsc_frequency(addr_t fadt_addr)
 			return Hw::Tsc::rdtsc();
 		});
 
-	if (!val)
-	{
-		Genode::error("Unable to calibrate TSC, returning default value");
+	if (!val) {
+		warning("Unable to calibrate TSC, returning fixed TSC frequency of ", default_freq, "kHz");
 		return default_freq;
 	}
 
