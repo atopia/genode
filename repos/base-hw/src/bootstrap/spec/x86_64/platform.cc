@@ -101,7 +101,7 @@ static void calibrate_lapic_frequency(addr_t fadt_addr, uint32_t &ticks_per_ms, 
 	uint32_t const sleep_ms = 10;
 
 	if (!fadt_addr) {
-		Genode::error("FADT not found, setting minimum Local APIC frequency");
+		warning("FADT not found, setting minimum Local APIC frequency of ", default_ticks_per_ms, "kHz");
 		ticks_per_ms = default_ticks_per_ms;
 	}
 
@@ -119,7 +119,7 @@ static void calibrate_lapic_frequency(addr_t fadt_addr, uint32_t &ticks_per_ms, 
 	});
 
 	if (!ticks_per_ms) {
-		Genode::error("Unable to calibrate local APIC, setting minimum frequency");
+		warning("FADT not found, setting minimum Local APIC frequency of ", default_ticks_per_ms, "kHz");
 		ticks_per_ms = default_ticks_per_ms;
 	}
 }

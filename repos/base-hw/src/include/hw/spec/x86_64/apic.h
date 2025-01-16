@@ -90,7 +90,7 @@ struct Hw::Local_apic : Genode::Mmio<Hw::Cpu_memory_map::LAPIC_SIZE>
 		for (Divide_configuration::access_t div = Divide_configuration::Divide_value::MAX;
 		     div && ticks_per_ms < TIMER_MIN_TICKS_PER_MS; div--)
 		{
-			if (!div){
+			if (!div) {
 				raw("Failed to calibrate Local APIC frequency");
 				ticks_per_ms = 0;
 				break;
