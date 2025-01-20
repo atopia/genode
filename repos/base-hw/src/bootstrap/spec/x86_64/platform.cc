@@ -127,7 +127,7 @@ static void calibrate_lapic_frequency(addr_t fadt_addr, uint32_t &ticks_per_ms, 
 
 static void disable_pit()
 {
-	using Bootstrap::outb;
+	using Hw::outb;
 
 	enum {
 		/* PIT constants */
