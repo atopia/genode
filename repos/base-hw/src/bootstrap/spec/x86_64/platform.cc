@@ -147,6 +147,38 @@ static void disable_pit()
 }
 
 
+/*
+ * Enable dispatch serializing lfence instruction on AMD processors.
+ *
+ * See:
+ * Software techniques for managing speculation on AMD processors
+ * Revision 5.09.23
+ * Mitigation G-2
+ */
+static void amd_enable_serializing_lfence()
+{
+	using Cpu = Hw::X86_64_cpu;
+
+	if (Hw::Vendor::get_vendor_id() != Hw::Vendor::Vendor_id::AMD)
+		return;
+
+	unsigned const family = Hw::Vendor::get_family();
+
+	/* In family 0Fh and 11h, lfence is always dispatch serializing */
+	if ((family == 0x10) ||
+	    (family == 0x12) ||
+	    /*
+	     * "AMD plans support for this MSR and access to this bit for all
+	     * future processors."
+	     */
+	    (family >= 0x14)) {
+		Cpu::Amd_lfence::access_t amd_lfence = Cpu::Amd_lfence::read();
+		Cpu::Amd_lfence::Enable_dispatch_serializing::set(amd_lfence);
+		Cpu::Amd_lfence::write(amd_lfence);
+	}
+}
+
+
 Bootstrap::Platform::Board::Board()
 :
 	core_mmio(Memory_region { 0, 0x1000 },
@@ -331,6 +363,14 @@ Bootstrap::Platform::Board::Board()
 		cpus = !cpus ? 1 : max_cpus;
 	}
 
+        /*
+         * Enable serializing lfence on supported AMD processors.
+         *
+         * For APs this will be set up later, but we need it already to obtain
+         * the most acurate results when calibrating the TSC frequency.
+         */
+        amd_enable_serializing_lfence();
+
 	info.tsc_frequency = calibrate_tsc_frequency(info.acpi_fadt);
 	calibrate_lapic_frequency(info.acpi_fadt, info.lapic_ticks_per_ms, info.lapic_div);
 
@@ -401,13 +441,18 @@ unsigned Bootstrap::Platform::enable_mmu()
 	if (__cpus_booted >= board.cpus)
 		__cpus_booted = 0;
 
+
+
 	/* skip wakeup IPI for non SMP setups */
 	if (board.cpus <= 1)
 		return (unsigned)cpu_id;
 
-	if (!Cpu::IA32_apic_base::Bsp::get(lapic_msr))
-		/* AP - done */
+	if (!Cpu::IA32_apic_base::Bsp::get(lapic_msr)) {
+		/* AP */
+		/* Enable serializing lfence on supported AMD processors. */
+		amd_enable_serializing_lfence();
 		return (unsigned)cpu_id;
+	}
 
 	/* BSP - we're primary CPU - wake now all other CPUs */
 
