@@ -219,3 +219,11 @@ void Vm::inject_irq(unsigned irq)
 	pause();
 	_context.submit(1);
 }
+
+
+void Vm::run()
+{
+	_sync_from_vmm();
+	if (_scheduled != ACTIVE) Cpu_context::_activate();
+	_scheduled = ACTIVE;
+}
