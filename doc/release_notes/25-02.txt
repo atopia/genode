@@ -246,39 +246,84 @@ Init configuration improvements
 Simplified RAM assignments
 --------------------------
 
-commit 1bbda2b963dbd6a0bf7044293ed7ea4bdc634bdd
-author: norman feske <norman.feske@genode-labs.com>
-date:   fri feb 7 17:29:35 2025 +0100
+In init's configuration, the assignment of RAM to a component is expressed as follows:
 
-    init: ram quota as start-node attribute
-    
-    this patch allows for the assignment of ram to a start node via a new
-    'ram' attribute as an alternative to traditional '<resource name="ram">'
-    nodes. this makes configurations more concise.
-    
-    it also adds support for defining a configuration-global default ram
-    quota, following the existing pattern of the default caps definition,
-    e.g. the following <default> node alleviates the need to repeatedly
-    state reasonable 'ram' and 'caps' values in each single start node.
-    
-      <default caps="100" ram="1m"/>
-    
-    fixes #5448
+! <start name="report_rom">
+!   ...
+!   <resource name="RAM" quantum="2M"/>
+!   ...
+! </start>
+
+We have now introduced a new 'ram' attribute as a concise alternative.
+
+! <start name="report_rom" ram="2M">
+!   ...
+! </start>
+
+This change is complemented with the ability of defining a global default RAM
+quota following the existing pattern of the default caps definition, e.g. the
+following '<default>' node alleviates the need to repeatedly state reasonable
+'ram' and 'caps' values in each single start node.
+
+! <default caps="100" ram="1m"/>
+
 
 Partial session-label rewriting
 -------------------------------
 
-commit 00aef2643c702475f2d3709de8ac0dbf301959fe
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Wed Feb 12 15:17:35 2025 +0100
+When
+[https://genode.org/documentation/genode-foundations/24.05/system_configuration/The_init_component.html#Session_routing - routing]
+a session request, a route can be selected by using a label (or a label suffix
+or a label prefix) as key.
+In the target node ('<parent/>' or '<child name="..."/>'), it is possible to
+[https://genode.org/documentation/genode-foundations/24.05/system_configuration/The_init_component.html#Session-label_rewriting - replace]
+the label by another one. For example, the following routing rule matches a
+ROM session labeled "config". If the route is taken, the session is directed
+to the config_fs_rom server and the label is rewritten to "managed/runtime".
+So the server will hand out this file as ROM module, which then appears as
+"config" at the client.
 
-    init: make label rewriting more flexible
-    
-    This patch complements the existing 'label' attribute of session-route
-    target nodes with the new 'identity', 'resource', and 'prepend_resource'
-    attributes that allow for the partial rewriting of the label.
-    
-    Fixes #5447
+! <route>
+!   ...
+!   <service name="ROM" label="config">
+!     <child name="config_fs_rom" label="managed/runtime"/> </service>
+!   ...
+! </route>
+
+In hierarchic scenarios (e.g., nested instances of init), labels assume a form
+like "runtime -> system_shell -> terminal -> config". The client's intent (in
+this case, the client wants to obtain "config") is successively watermarked by
+the components in the chain of authority involved in the session creation.
+In the example, the terminal's session request traverses the system-shell init
+as well as the runtime init before reaching the server.
+
+In short, the label encodes two things: the expression of the client's intent
+(naming a server-provided resource like ROM module), and an unforgeable (by
+the client) representation of the client's identity as observed by the server.
+The former is the last part of the label whereas the latter are all the
+leading parts.
+
+Init's label rewriting mechanism is a useful tool of abstraction, which allows
+for grouping clients to roles. However, as the label can only be rewritten as
+a whole, the rewriting rule needs to know both the client's identity and the
+client's intent. Should the client's intent vary (e.g., a client requesting a
+variety of ROM modules), a dedicated rewriting rule is needed for each case.
+By introducing the following new attributes for the selective rewriting of
+only the identity or the resource part of the label, such policies become much
+easier to express.
+
+:'identity="rw"': replaces the identity part of the label by "rw" while
+  keeping the resource part. So the client's identity can be replaced by
+  a role while keeping the client's intent intact.
+
+:'resource="/bin/"': replaces the client's intent while retaining the
+  client's identity. Here, a client's request for a file-system session
+  becomes hardwired to one directory of the server.
+
+:'prepend_resource="/usr/local"': prepends the resource part of the label with
+  a given prefix. The example restricts the client-provided path to the
+  bounds of the server's /usr/local/ directory, as a substitute for the
+  traditional chroot component.
 
 
 Enriched file-system session-label convention
