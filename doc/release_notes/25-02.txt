@@ -1035,80 +1035,48 @@ The profile corresponds to Intel Core processors of the year 2010 or newer.
 Streamlined handling of run-script preconditions
 ================================================
 
-; @nfeske
+Not all run scripts are compatible with all kernels, boards, architectures, or
+circumstances. Usually, such constraints had been expressed by statements
+like this:
 
-commit c87f0f77c25e60d4cce6c2f3f519902a8bc94ee2
-Author: Roman Iten <roman.iten@gapfruit.com>
-Date:   Tue Feb 11 12:08:00 2025 +0100
+! if {![have_board pc]} {
+!   puts stderr "only supported on PC hardware"
+!   exit 0
+! }
 
-    tool/run: introduce 'have_recipe'-proc
-    
-    This procedure is useful for run scripts that depend for example on a
-    board support package that is provided only for certain boards, possibly
-    by a third-party repo.
-    
-    Issue #5432
+Over the years and with the number of run scripts growing, those preconditions
+have become complex and many. Moreover, run scripts backing out because of
+an unsatisfied precondition are not easy to distinguish from successful run
+scripts when executed in automated fashion. Thanks to the welcome
+[https://github.cokm/genodelabs/genode/issues/5432 - initiative] of Roman Iten
+of [https://gapfruit.com - Gapfruit, the precondition checks for executing
+run scripts have now become largely streamlined and much simpler.
 
-commit 9aa11f94377e84e048c83905387648d1cf911843
-Author: Roman Iten <roman.iten@gapfruit.com>
-Date:   Wed Feb 5 16:27:18 2025 +0100
+The run tool has been extended by an 'assert' function that is dedicated for
+expressing the preconditions of a run script. So the above example becomes:
 
-    tool/run: introduce '[have_]cmd_arg'-procs
-    
-    Renaming 'get_cmd_switch' and 'get_cmd_arg' to 'have_cmd_arg' and
-    'cmd_arg' respectively blends in nicely with the now omnipresent pattern
-    with 'have_[spec|board|installed|include]'.
-    
-    This commit deprecates 'get_cmd_switch' and 'get_cmd_arg', which will be
-    removed in a later commit.
-    
-    Issue #5432
+! assert {[have_board pc]}
 
-commit d622059d84de6dcc7803d6f42da14fe39f406d0e
-Author: Roman Iten <roman.iten@gapfruit.com>
-Date:   Wed Feb 5 18:14:44 2025 +0100
+Note that the message can be dropped because any unsatisfied precondition
+is conveniently printed in the log. However, a more instructive message can
+be specified as an optional second argument.
 
-    tool/dts: rename 'get_cmd_[arg|switch]'-proc
-    
-    ...to be consistent with the naming in tool/run.
-    
-    Related to #5432
+To make this pattern as ergonomic and natural as possible, the naming of the
+run tool's various checking functions have been unified as slightly extended.
+The former 'get_cmd_switch' and 'get_cmd_arg' functions are now named
+'have_cmd_switch' and 'cmd_arg'. A new 'have_recipe' function returns true
+whenever the specified depot recipe is present. This way, the compatibility
+of a run script with any board where a 'drivers_interactive' package is
+defined can be expressed in a much more concise way compared to the former
+enumeration of supported boards:
 
-commit 2153c3cce79c57b76f830e4d9e8a39615d367225
-Author: Roman Iten <roman.iten@gapfruit.com>
-Date:   Wed Feb 5 18:10:51 2025 +0100
+! assert {[have_recipe pkg/[drivers_interactive_pkg]]}
 
-    tool/autopilot: rename 'get_cmd_[arg|switch]'-proc
-    
-    ...to be consistent with the naming in tool/run.
-    
-    Related to #5432
+The change of the run tool is accompanied with an improvement of Genode's
+autopilot tool that distinguishes unsatisfied run scripts from successfully
+executed run scripts.
 
-commit e4a726e20a5b4ea607cef891b5ad5deca6c4a041
-Author: Roman Iten <roman.iten@gapfruit.com>
-Date:   Wed Jan 22 10:06:43 2025 +0100
-
-    tool/autopilot: mark incompletely executed tests
-    
-    ...with "ABORT", in case of an unmet 'assert_spec' in the run scenario.
-    
-    Issue #5432
-
-commit 71f203d802040ece29df0f67d06b9e2ffa0e0e82
-Author: Roman Iten <roman.iten@gapfruit.com>
-Date:   Wed Jan 22 10:07:24 2025 +0100
-
-    tool/run: introduce generalized 'assert'-proc
-    
-    Issue #5432
-
-commit e87b82d04b42c946199bbe5ebde3a88986b177e7
-Author: Roman Iten <roman.iten@gapfruit.com>
-Date:   Wed Jan 22 10:49:56 2025 +0100
-
-    os: use 'assert'-proc in run scripts
-    
-    Issue #5432
+Thanks to Roman for this careful, tasteful, and comprehensive contribution!
 
 
 Meshcmd as alternative AMT tool
