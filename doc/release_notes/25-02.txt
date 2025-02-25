@@ -995,25 +995,25 @@ Furthermore, we updated the built-in depot archive versions to Sculpt 24.10.3.
 Compilation changes
 ===================
 
-; @nfeske
+The use of ARM Neon and Intel SSE4 in the context of the SIMD optimizations
+mentioned in Section [SIMD optimizations], we encountered two limitations of
+our tool chain's default behavior.
 
-commit a5d3613f506b068b2f3fa891901b15ff9e9d63f0
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Tue Jan 28 17:20:59 2025 +0100
+First, even though Genode does not depend on the host system's C library (a
+few hybrid Genode/Linux components notwithstanding), the tool chain defines
+'__STDC_HOSTED__' by default. This becomes a problem when using the ARM-Neon
+compiler intrinsics, which rely on the compiler's _stdint.h_, which in turn
+expects the presence of a C library whenever '__STDC_HOSTED__' is set. To
+discharge this wrong expectation, we explicitly specify the '-ffreestanding'
+compiler argument by default now. In the rare case of a hybrid Genode/Linux
+component, this default can be overridden by setting 'CC_OPT_FREESTANDING' to
+an empty value in the target's build-description file.
 
-    build: set -march=x86-64-v2 for x86_64
-    
-    This allows for the use of SSE4.1 intrinsics.
-    
-    Fixes #5440
-
-commit 63b49fcdb32e6503b31b80f2dea64a7b787f5a87
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Tue Jan 21 12:19:56 2025 +0100
-
-    Enable -ffreestanding by default
-    
-    Fixes #5429
+Second, the tool chain does not allow for the use of SSE4 compiler intrinsics
+on x86 by default. Instead of merely enabling SSE4 via the '-msse4' compiler
+argument, we decided to globally switch to the '-march=x86-64-v2' profile to
+denote the processor generation with all its features as common base line.
+The profile corresponds to Intel Core processors of the year 2010 or newer.
 
 
 Streamlined handling of run-script preconditions
