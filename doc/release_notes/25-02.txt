@@ -329,49 +329,38 @@ easier to express.
 Enriched file-system session-label convention
 =============================================
 
-; @nfeske
+Genode 25.02 changes the way of how a client-selected sub directory is
+communicated to the file-system server at session-creation time. The former
+opaque session argument is now passed as last label element, which allows for
+the flexible tweaking of this argument by init's session-routing and
+label-rewriting mechanisms. In particular, it alleviates the need for creating
+chroot component instances.
 
-commit fb65e97eb0ffabf4c75065a357905a247d813b96
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Wed Feb 5 16:01:26 2025 +0100
+This change requires the following four adaptations at the configuration
+level:
 
-    file-system session: root dir via session label
-    
-    This patch changes the way of how the client-selected sub directory is
-    communicated to the server. The former opaque session argument is now
-    passed as last label element, which allows for the flexible tweaking
-    of this argument by init's session-routing and label-rewriting
-    mechansims. In particular, it alleviates the need for creating chroot
-    component instances.
-    
-    This change requires the following four adaptations at the
-    configuration level:
-    
-    - Each file-system session request must now carry a path starting
-      with / as last session arguments. Hence, <vfs> <fs> nodes that
-      feature a 'label' attributes must extend the attribute value
-      with " -> /". For <fs> nodes with no label attribute, "/" is
-      used as last label argument by default.
-    
-    - For matching session-routing rules at init's configuration,
-      the matching of full labels should be replaced by 'label_prefix'
-      matches, excluding the last (path) argument.
-    
-    - Wherever a label of a file-system session is rewritten by using
-      init's 'label' attribute of a <parent> or <child> target node,
-      the new attribute 'identity' should be used instead. This replaces
-      the identity part of the label while preserving the client's
-      directory argument.
-    
-    - Analogously to the matching of session-routing rules, server-side
-      policy-selection rules that formerly matched a concrete 'label'
-      must be changed to match a 'label_prefix' instead.
-    
-    As a good practice, 'label_prefix' values should end with " ->" if
-    possible, which clearly delimits the identity part of the label
-    used by the matching.
-    
-    Issue #5445
+* Each file-system session request must now carry a path starting
+  with / as last session argument. Hence, '<fs>' nodes of the VFS that
+  feature a 'label' attribute must extend the attribute value
+  with " -> /". For '<fs>' nodes with no label attribute, "/" is
+  used as last label argument by default.
+
+* For matching session-routing rules at init's configuration,
+  the matching of full labels must be replaced by 'label_prefix'
+  matches, excluding the last (path) argument.
+
+* Wherever a label of a file-system session is rewritten by using
+  init's 'label' attribute in a '<parent>' or '<child>' target node,
+  the new attribute 'identity' should be used instead. This replaces
+  the identity part of the label while preserving the client's
+  directory argument.
+
+* Analogously to the matching of session-routing rules, server-side
+  policy-selection rules that formerly matched a concrete 'label'
+  must be changed to match a 'label_prefix' instead.
+
+As a good practice, 'label_prefix' values should end with " ->" if possible,
+which clearly delimits the identity part of the label used by the matching.
 
 
 SIMD optimizations
