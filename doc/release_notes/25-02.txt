@@ -332,43 +332,25 @@ Date:   Wed Feb 5 16:01:26 2025 +0100
 SIMD optimizations
 ==================
 
-; @nfeske
+With screen resolutions growing, the proliferation of multi-monitor setups,
+and in anticipation of screen-rotation support later this year, our existing
+pixel-shovelling routines show their limitations. This prompted us to
+investigate the use of SIMD (single instruction multiple data) for such
+purpose, leveraging ARM Neon on the 64-bit ARM architecture and SSE4 on the
+64-bit x86 architecture.
 
-commit 0a756e44abf8b5e5a0a561700c88fde4fc7f98fe
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Thu Jan 16 19:35:01 2025 +0100
+We put our attention on two well known bottlenecks, namely the back-to-front
+blitting performed by display drivers and alpha blending performed by the
+nitpicker GUI server. The existing blit library has been extended by two new
+interfaces 'Blit::back2front' and 'Blit::blend_xrgb_a' accommodating these use
+cases. With the planned support for screen rotation in the back of our heads,
+the 'back2front' implementation supports the rotation by 0, 90, 180, and 270
+degrees as well as screen flipping.
 
-    blit: SIMD-based back2front copy
-    
-    Issue #5428
-
-commit d0d0b69228772dc79d2ef770079af207992fbab1
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Mon Jan 20 16:51:00 2025 +0100
-
-    Capture::Connection::Screen: use Blit::back2front
-    
-    Issue #5428
-
-commit 1eca184f18baadf95ed09bf11499085d8dc409d7
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Mon Jan 20 17:35:39 2025 +0100
-
-    fb_sdl: support rotate and flip
-    
-    Issue #5428
-
-commit c9863e51e39b0716a0259b5b1173c80bc57af0dc
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Sat Jan 25 13:08:37 2025 +0100
-
-    blit: Blit::blend_xrgb_a
-    
-    This commit adds support for SIMD-based alpha blending, which speeds up
-    the alpha-compositing of the nitpicker GUI server by circa 300% on ARM
-    Neon and x86_64 using SSE4.1
-    
-    Issue #5428
+Our effort spent on the SIMD optimizations paid off. The new versions improve
+the performance roughly by factor 3 compared to our original routines.
+Non-SIMD implementations of the same interfaces are available as fallback,
+which is employed on 32-bit architectures and RISC-V.
 
 
 Qt, WebEngine, and Falkon browser
