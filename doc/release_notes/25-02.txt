@@ -574,59 +574,10 @@ features or new platforms to the kernel, we add additional recognition and
 information printing about the hardware state during a fault when executing a
 core's thread or kernel context.
 
-; @atopia
-
-commit 89f7834b1752e42aefbd718b85a08da43fb88b2e
-Author: Benjamin Lamowski <benjamin.lamowski@genode-labs.com>
-Date:   Wed Jan 8 10:45:33 2025 +0100
-
-    hw: calibrate TSC via ACPI timer
-    
-    To get the Time Stamp Counter's frequency, hw relied on a complex and
-    incomplete algorithm.
-    
-    Since this is a one-time initialization issue, move TSC calibration to
-    bootstrap and implement it using the ACPI timer.
-    
-    Issue #5215
-
-commit ec5e1a6b4b4039cb25987b1784b56ff7ad624e2e
-Author: Benjamin Lamowski <benjamin.lamowski@genode-labs.com>
-Date:   Thu Jan 9 11:31:42 2025 +0100
-
-    hw: calibrate Local APIC via ACPI timer
-    
-    Upto now, bootstrap used the Programmable Interval Timer to set a
-    suitable divider and determine the frequency of the Local APIC.
-    The PIT is not available on recent x86_64 hardware anymore.
-    
-    Move Local APIC calibration to bootstrap and use the ACPI timer as a
-    reference. Clean up hw's timer implementation a little and disable the
-    PIT in bootstrap.
-    
-    Fixes #5215
-
-commit 02b7878229b605a25ea0e21cc5e3e4e2d300b84e
-Author: Benjamin Lamowski <benjamin.lamowski@genode-labs.com>
-Date:   Tue Jan 21 16:26:52 2025 +0100
-
-    hw: always serialize rdtsc reads
-    
-    While implementing TSC calibration in #5215, the issue of properly serializing
-    TSC reads came up. Some learnings of the discussion were noted in #5430.
-    
-    Using `cpuid` for serialization as in Trace::timestamp() is portable,
-    but will cause VM exits on VMX and SVM and is therefore unsuitable to
-    retain a roughly working calibration loop while running virtualized.
-    On the other hand on most AMD systems, dispatch serializing `lfence`
-    needs to be explicitly enabled via a non-architectural MSR.
-    
-    Enable setting up dispatch serializing lfence on AMD systems and always
-    serialize rdtsc accesses in Hw::Tsc::rdtsc() for maximum reliability.
-    
-    Issues #5215, #5430
-
-
+In order to support modern x86 hardware that doesn't feature a legacy
+Programmable Interval Timer, we have consolidated the calibration of the Time
+Stamp Counter and Local APIC to use the ACPI timer during bootstrap and provide
+the base-hw kernel with the calibration values as part of the boot information.
 
 NOVA microhypervisor
 ====================
