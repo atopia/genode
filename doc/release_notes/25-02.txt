@@ -215,6 +215,65 @@ Date:   Mon Feb 10 12:27:32 2025 +0100
     Issue #5449
 
 
+Qemu on Genode
+##############
+
+[https://en.wikipedia.org/wiki/QEMU - qemu] is an all purpose open-source tool
+for cross-architecture emulation of whole operating systems. It merits for
+efficient and rapid developments is unmatched for a lot of system developers
+and thereby also in very active use by Genode.
+
+We long for using Qemu natively on Genode since quite a time, e.g. documented
+by the [https://github.com/genodelabs/genode/issues/116 - github issue] dated
+back to 2012. Actually, in 2019 there was already the attempt,
+as documented in the issue, to get it up and running,
+which - well - succeeded to the degree that it compiled and linked. At that
+time the build system of Qemu was way to complex to be used directly
+with the Genode framework and hand-made solutions were common.
+Though, such attempts tend to be updated very seldom or never,
+which happened to happen also for this 2019 attempt, so the approach was
+condemned to fail for the long run.
+
+Since then the [https://github.com/genodelabs/goa - goa] tool entered the
+picture and evolved over the years to the point to give a Qemu port another
+try. The approach of goa to re-use the original build infrastructure for a port
+as close as possible unmodified induced hope. Though, over the last year we
+worked on bringing Qemu with the help of goa to Genode and we are happy to
+announce, that we reached a state that we are now able to run Qemu 9.0.1 on
+x86_64 for the emulation target architectures of ARM, e.g. qemu-system-aarch64
+and qemu-system-arm.
+
+The goa sources of the port are available via alex-ab's
+[https://github.com/alex-ab/goa-projects/commits/qemu_25_02 - goa repository]
+and additionally ready-to-use packages for Sculpt OS 24.10 are available.
+After downloading the packages via alex-ab' Sculpt index and
+deploying them, initial configuration files will be imported into the
+selected filesystem named config.qemu.aarch64 or config.qemu.arm. Those
+files can be adjusted for the desired board an emulation target, e.g:
+
+! ...
+! <arg value="qemu-system-aarch64"/>
+! <arg value="-M"/>         <arg value="raspi3b"/>
+! <arg value="-m"/>         <arg value="1024"/>
+! <arg value="-nographic"/>
+! <arg value="-serial"/>    <arg value="null"/>
+! <arg value="-serial"/>    <arg value="mon:stdio"/>
+! <arg value="-kernel"/>    <arg value="/image_raspi3b"/>
+! ...
+
+shows the familiar Qemu configuration options in form of Genode's XML
+configuration style. In this concrete example, a Raspberry PI 3b target
+is setup, which expects the image to be located next to the configuration file
+and is named _image_raspi3b_. After adjusting the configuration file,
+the component just needs to be re-started and Qemu will re-run with the new
+configuration.
+
+The current port is still work in progress. Further potentially directions are
+the support of qemu-system-x86_64 and adding support of using Genode's VM
+session interface to leverage hardware assisted virtualization, e.g. yet
+another options for the Seoul VMM and the Virtualbox VMMs on x86.
+
+
 Base framework and OS-level infrastructure
 ##########################################
 
