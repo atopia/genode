@@ -14,191 +14,171 @@
 Multi-monitor window management and virtual machines
 ####################################################
 
-; @nfeske, @chelmuth
+With
+[https://genode.org/documentation/release-notes/24.11#Multi-monitor_support - version 24.10],
+Sculpt OS became usable for mirrored and panoramic multi-monitor setups. In a
+panoramic setup, each display shows a portion of a larger panorama maintained
+by the nitpicker GUI server. So the displays combined behave like a very large
+display. The administrative user interface is already multi-monitor-aware. It
+is presented only on the display that hosts the mouse pointer, thereby
+ensuring that the entirety of the user interface is reachable at all times,
+and to limit the maximum size of the user interface to the resolution of the
+largest display (not the total panorama size, which can be much larger).
 
-commit c3c217b0c5495fe50639e8752c78016d478d6b6e
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Tue Nov 12 15:57:05 2024 +0100
+The current release extends Genode's multi-monitor awareness to the
+window manager and its companion components, addressing the interplay
+between virtual desktops and physical displays, preserving the reachability
+of all applications whenever a display is unplugged, and improving the
+usability of interactive window manipulations.
 
-    window_layouter: assignment of screens to displays
-    
-    This patch enhances the window layouter with the notion of displays
-    and the assignment of screens to displays.
-    
-    Issue #5390
 
-commit b7c97a61c01102fc5310c04a9b405a6760523718
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Fri Nov 15 13:13:32 2024 +0100
+GUI stack
+---------
 
-    wm/decorator/layouter: window clipping
-    
-    This patch changes the window-layout format to support the rectangular
-    clipping of windows at screen boundaries. The new <boundary> node defines
-    the clipping boundary for the windows listed within the node. Boundaries
-    are expected to be disjoint. In the example below, the "vbox" window is
-    placed partially outside the screen area of "screen_2".
-    
-    <window_layout>
-      <boundary name="screen_1" xpos="0" ypos="0" width="640" height="480">
-        <window id="1" title="launchpad" xpos="10" ypos="140" width="400" height=">
-      </boundary>
-      <boundary name="screen_2" xpos="640" ypos="0" width="800" height="600">
-        <window id="2" title="vbox"     xpos="520" ypos="52" width="800" height="600">
-        <window id="3" title="terminal" xpos="650" ypos="72" width="500" height="400">
-      </boundary>
-    </window_layout>
-    
-    The layouter uses boundaries to restrict the visiblilty of windows to
-    their respective target areas.
-    
-    Until now, Sculpt relied on the fact that the window-layout ROM had the
-    same structure as the resize-request ROM. With the addition of the
-    <boundary> nodes, this is no longer the case. Therefore, the Sculpt
-    manager generates a dedicated resize-request ROM now.
-    
-    Issue #5390
+The GUI stack comprises the following components.
 
-commit ad57ca1ce4b27329bab20467c4d18dfb481483c3
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Wed Nov 27 19:24:09 2024 +0100
+[image multi_monitor_wm]
 
-    window_layouter: drag windows between displays
-    
-    This patch allows the user to drag windows from one target area (i.e.,
-    display) to another whereas the resizing of windows is restricted to
-    the window's original target area. The latter point is important to
-    ensure that the window's resize handles remain reachable at all times.
-    
-    Issue #5390
+At the bottom, one or more display drivers access the physical displays
+attached to the machine. For each display, the driver maintains a distinct
+physical frame buffer and creates a capture session at the GUI server.
+From the perspective of the GUI server, a display driver appears as a GUI
+capturing client. The GUI server maintains a panorama, which is a single 2D
+coordinate system where GUI applications are placed. Its configuration
+defines which part of the panorama gets exposed to which capture client.
+In the example, the eDP capture client obtains the left part whereas
+the HDMI capture client obtains the right part.
 
-commit 9541fbb1c95a67b5fef9ece250c31c955374ac66
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Thu Nov 28 16:54:35 2024 +0100
+The window manager (wm) uses the nitpicker GUI server as client and acts
+as a GUI server itself, providing the same interface as nitpicker. Sitting
+in-between the nitpicker GUI server and the application, it transparently
+supplements the notion of windows and virtual desktops.
+Among the window-manager clients, two components stand out by having special
+roles. The window layouter defines which application is presented at which
+part of the panorama by generating a window layout. The window layout is
+produced according a rules, which are configurable by the user and are
+updated by interactive layout changes like moving a window.
+The decorator, in turn,
+paints window decorations according to this window layout. Note that neither
+the layouter nor the decorator are able to observe information displayed
+by the application or any user input directed to the application.
 
-    window_layouter: allow screen-change during drag
-    
-    This patch enables the user to interactively change the assignment of
-    windows to screens. For screens visible side by side in a multi-monitor
-    setup, one can now move a window from one screen to another by dragging
-    the window title. When using screens as virtual desktops on one display,
-    a window can be moved to another screen by switching the screen (by
-    pressing a key matching a desired screen) while the window is dragged
-    with the mouse. So the user can drag the window between virtual desktops.
-    
-    Issue #5390
+The window layouter introduces the abstraction of virtual desktops named
+screens for brevity. Each screen can be assigned to a part of the panorama.
+If two screens are assigned to the same part, only the top-most screen
+is displayed. In the example, screens 1 to 3 are assigned to the part
+captured by the eDP monitor whereas screens 4 to 6 are assigned to the
+part captured by the HDMI monitor.
 
-commit b8147afe4f2246783cab00089d675092dd758d58
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Fri Nov 29 15:45:11 2024 +0100
+A regular GUI application connected to the window manager only observes
+its corresponding display as its virtual panorama. A multi-window application
+maintains one GUI session per window. So from the window-manager's
+perspective, each window appears as a separate GUI client.
 
-    window_layouter: modernized coding style
-    
-    Replace the use of pointers and the copying of XML nodes by the 'with_'
-    pattern. Use plain struct where appropriate, replace constructors by { }
-    initialization. Use C++20 function template syntax. Replace accessors by
-    public constants where possible. Follow 'from_xml' convention. Follow
-    usual 'Action' interface naming.
-    
-    Issue #5390
 
-commit 9855dcb3afe577cb93433f72676d880b51fa4f77
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Tue Dec 3 17:32:38 2024 +0100
+Screen-to-display assignment
+----------------------------
 
-    window_layouter: restrict focus to visible windows
-    
-    This patch restricts the focus switching via the keyboard (Super-Tab) to
-    windows located at visible screens.
-    
-    Should the currently focused window become invible, switch the focus to the
-    most recently focused visible window.
-    
-    Issue #5390
+The layouter rules can host any number of display declarations as follows.
 
-commit 4fff0f7b0cc62023d0a3f5eb71b4e9cfcef51687
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Fri Dec 6 13:55:47 2024 +0100
+! <display name="primary"/>
 
-    window_layouter: "pick_up" and "place_down" action
-    
-    The new 'action' attribute values can be used to realize the
-    keyboard-based assignement of windows to screens. The "pick_up" action
-    (on a key press) selects the focused window to be held at the current
-    position until the "place_down" action is issued (by a key release).
-    While the focused window is held, "screen" actions can be executed
-    taking the picked up window to the selected screen.
-    
-    Issue #5390
+Optional attributes 'xpos', 'ypos', 'width', and 'height' can be specified to
+assign a specific rectangle of the panorama to the display. Otherwise, the
+window layouter applies the following policy. The captured rectangles present
+in the panorama are assigned to displays in left to right order. This gives the
+opportunity to assign the notion of a "primary" or "secondary" display to
+different parts of the panorama by the mere order of '<display>' nodes. If
+more displays are declared than present, all unassigned displays will refer to
+the left-most captured rectangle of the panorama.
 
-commit 7ad94a06829abb6d2baa40a89b65d2769f4ba6f5
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Tue Nov 26 14:05:06 2024 +0100
+To get more precise control over the assignment of captured areas to displays,
+a display node can host any number of '<capture>' sub nodes that are matched
+against the captured areas present within the panorama. The panorama areas are
+named after the labels of capture clients (i.e., display drivers) present at
+the nitpicker GUI server. The matching can be expressed via the attributes
+'label', 'label_prefix', and 'label_suffix'. The first match applies.
+E.g., the following configuration may be useful for a laptop that is sometimes
+connected to an HDMI display at work or a Display-Port display at home.
 
-    pkg/window_layouter: rules format change -> 24.12
-    
-    To accommodate multi-monitor window management, the window-layouter
-    rules must be extended. By renaming the rules file to a version number
-    reflecting the date of change (24.12), we prevent the loss of
-    window-layout state when switching back and forth between different
-    versions of the window-layouter.
-    
-    The default rules contain now the definition of three displays
-    ("primary", "secondary", and "ternary") and map 3 screens to each
-    display.
-    
-    Issue #5390
+! <display name="primary">
+!   <capture label_suffix="HDMI-1"/>
+!   <capture label_suffix="DP-2"/>
+!   <capture label_suffix="eDP-1"/>
+! </display>
+! <display name="secondary">
+!   <capture label_suffix="eDP-1"/>
+! </display>
 
-commit d8c6e74142a8c1fa13f08800095dcaf97e2c4a6f
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Tue Dec 10 17:30:10 2024 +0100
+When neither the HDMI-1 display nor the DP-2 display is present, the laptop's
+internal eDP display is used as both primary and secondary display. Once an
+external display is connected, the external display acts as primary display
+while the laptop's internal display takes the role of the secondary display.
 
-    window_layouter: handle drag/drop as actions
-    
-    This patch moves the formerly hard-wired drag-and-drop handling
-    to the configuration level by introducing the actions "drag" and "drop".
-    
-    To aid the robust handling of release events matching their
-    corresponding press events, the patch refines the policy-matching of the
-    current combination of keys against the hierarchy of <press> and
-    <release> nodes. If no policy for a concrete combination exists, a
-    release event also considers the policy of its matching <press> node.
-    This way, the regular drag-and-drop rules can be expressed as
-    
-      <press key="BTN_LEFT" action="drag">
-         <release key="BTN_LEFT" action="drop"/>
-      </press>
-    
-    This also works when releasing BTN_LEFT while pressing additional keys,
-    for which no policy exists.
-    
-    With this change, the layouter supports the matching of multiple key
-    sequences instead of only one, thereby supporting multiple actions at
-    once and allowing for decoupling different user interactions in the
-    configuration.
-    
-    Issue #5403
+Once declared, the display names can be specified as 'display' attribute to
+'<screen>' nodes, thereby assigning virtual desktops to displays. Screens
+referring to the same portion of the panorama are organized as a stack
+where only the top-most screen is visible at a time. As each display has
+its own distinct stack of screens, one screen cannot be visible at multiple
+displays. To mirror the same content on multiple displays, it is best to
+leverage the '<merge>' feature of the display driver. Should a '<screen>' lack
+a valid display attribute, it spans the entire panorama.
 
-commit c444aadc46fd64871de41a9ecec2de61cd590655
-Author: Norman Feske <norman.feske@genode-labs.com>
-Date:   Tue Dec 10 17:53:45 2024 +0100
 
-    window_layouter: free-arrange mode
-    
-    This patch adds the feature of moving and resizing windows by clicking
-    anywhere within a window while the global window-management key is held.
-    Depending on the position within the window, the click is interpreted as
-    click on the title (when clicking at inner 50% of the window, or as a
-    click on the border (when clicking at an area nearby the window
-    boundary).
-    
-    This mode of interaction requires more flexibility of the handling of
-    key sequences. The formerly hard-wired handling of the drag and drop as
-    response to BTN_LEFT events does not suffice. Therefore, this patch
-    moves the driving of the drag-and-drop state to the config level by
-    introducing the actions "drag" and "drop"
-    
-    Fixes #5403
+Improved focus switching and free-arrange layouting
+---------------------------------------------------
+
+The switching within the focus history (Super-Tab) is now restricted to
+windows that are located at visible screens. This avoids the need to tab
+through invisible windows, which is can be confusing when using windows scattered
+across several virtual desktops.
+
+Furthermore, the focus is now automatically changed to the most recently
+focused visible window whenever the currently focused window becomes
+invisible. This happens when switching between virtual desktops. This behavior
+hopefully also fits well with focus handling of temporary windows. When a
+temporary window appears, it needs to be focused manually (to prevent focus
+stealing). But once the temporary window disappears, the focus returns to the
+previously focused window.
+
+For interactively moving or resizing a window, the user needed to grab the
+corresponding window handles as presented by the decorator. We have now
+supplemented the ability to click anywhere within a window while the
+wm-modifier key (i.e., Super) is held. Depending on the position within the
+window, the click is interpreted as click on the title (when clicking at inner
+50% of the window, or as a click on the border (when clicking at an area
+nearby the window boundary).
+
+Up until now, the assignment of a window to another screen required a manual
+modification of the layouter rules, which was arguably not user friendly. Now,
+for screens visible side by side in a multi-monitor setup, one can now move a
+window from one screen to another by dragging the window title. When using
+screens as virtual desktops on one display, a window can be moved to another
+screen by switching the screen (by pressing a key matching a desired screen)
+while the window is dragged with the mouse. So the user can drag the window
+between virtual desktops.
+
+As an additional convenience, the currently focused window now be taken
+to another screen by pressing the wm-modifier key together with shift and
+the screen number.
+
+
+Versioned layouter rules and new defaults
+-----------------------------------------
+
+To accommodate the multi-monitor window management, we had to extend the
+window-layouter rules. By renaming the rules file to a version number
+reflecting the date of change (24.12), we prevent the loss of window-layout
+state when switching back and forth between different versions of the
+window-layouter.
+
+The default rules contain now the definition of three displays
+("primary", "secondary", and "ternary") and map 3 screens to each
+display.
+
+
+Multi-monitor virtual machines
+------------------------------
 
 commit 0166291121ab87d0a926182f8c2af3c2e7eeac13
 Author: Christian Helmuth <christian.helmuth@genode-labs.com>
