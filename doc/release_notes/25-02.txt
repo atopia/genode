@@ -877,9 +877,9 @@ is conveniently printed in the log. However, a more instructive message can
 be specified as an optional second argument.
 
 To make this pattern as ergonomic and natural as possible, the naming of the
-run tool's various checking functions have been unified as slightly extended.
+run tool's various checking functions have been unified and slightly extended.
 The former 'get_cmd_switch' and 'get_cmd_arg' functions are now named
-'have_cmd_switch' and 'cmd_arg'. A new 'have_recipe' function returns true
+'have_cmd_arg' and 'cmd_arg'. A new 'have_recipe' function returns true
 whenever the specified depot recipe is present. This way, the compatibility
 of a run script with any board where a 'drivers_interactive' package is
 defined can be expressed in a much more concise way compared to the former
