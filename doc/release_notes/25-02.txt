@@ -689,117 +689,38 @@ Date:   Tue Jan 21 16:26:52 2025 +0100
 NOVA microhypervisor
 ====================
 
-; @alex-ab
-
-commit 12f87260c03152feb0c51b5d4808ac2f43fd5ad5
-Author: Alexander Boettcher <alexander.boettcher@genode-labs.com>
-Date:   Tue Jan 7 11:12:30 2025 +0100
-
-    nova: add x2apic support
-    
-    Fixes #5413
-
+With this release we added support to detect and parse x2APIC entries
+of the ACPI [https://wiki.osdev.org/MADT - MADT] tables, which contain
+information to find and setup all CPUs during initialization of the NOVA
+kernel. Even so the x2APIC feature is required actually to support more than
+256 CPUs, the actual trigger was a new Intel Meteor Lake based Framework
+notebook with 24 CPUs. For this specific notebook however, no MADT entries for
+local APIC entries were available, just the x2APIC entries. We used this
+circumstance to synchronize and harmonize the local APIC implementation of
+the NOVA upstream development with the NOVA version as used by Genode.
 
 Lifted limitations on Fiasco.OC and seL4
 ========================================
 
-; @alex-ab
+During preparation of the 'Celebrating kernel diversity with Genode' talk
+at the open source conference
+[https://fosdem.org/2025/schedule/event/fosdem-2025-5768-celebrating-kernel-diversity-with-genode - FOSDEM 2025]
+, the Fiasco.OC and seL4 based platforms received several improvements in
+order to demo their principal working with Sculpt OS.
 
-commit 8a5fd27b46cc27942b2e312e9081c146e5ba78eb
-Author: Alexander Boettcher <alexander.boettcher@genode-labs.com>
-Date:   Thu Dec 12 23:31:02 2024 +0100
+The base-foc version got support to be bootable on UEFI based platforms
+by extending the core component to lookup and find the initial ACPI RSDP
+information. Additionally, the base-foc capability selector management in
+Genode got extended to support more capability selectors.
 
-    foc: add support to add ACPI rsdp in platform info
-    
-    which is required for UEFI boots.
-    
-    Issue #5406
+The base-sel4 platform received support to setup and use MSI interrupts for
+all devices and associated drivers, which improved the success rate of
+Sculpt OS noticeable on modern notebooks.
 
-commit 91a58d3e98930814bd95d1b614756e84f99aca16
-Author: Alexander Boettcher <alexander.boettcher@genode-labs.com>
-Date:   Thu Dec 12 17:13:26 2024 +0100
-
-    foc: increase max count for RPC caps in core
-    
-    to boot Sculpt
-    
-    Issue #5406
-
-commit 9239b36f0503788a873bf54c70272764fa45606f
-Author: Alexander Boettcher <alexander.boettcher@genode-labs.com>
-Date:   Wed Jan 15 11:16:55 2025 +0100
-
-    platform: be robust on IRQ creation failure
-    
-    In case invalid IRQ numbers are used (255 on x86), the IRQ session creation
-    request may be denied and the platform driver is killed because of the
-    uncatched exception, which must be avoided.
-    
-    Issue #5406
-    
-commit a8b3193d738339082fef97e59547973623606c49
-Author: Alexander Boettcher <alexander.boettcher@genode-labs.com>
-Date:   Wed Jan 15 18:29:17 2025 +0100
-
-    tool: use bender hwp options also for foc and seL4
-    
-    Issue #5406
-
-commit 935681a7f4e32c8b20ce63c5039c220b1dc7ec1a
-Author: Alexander Boettcher <alexander.boettcher@genode-labs.com>
-Date:   Mon Jan 20 19:18:25 2025 +0100
-
-    foc: support more caps
-    
-    by increasing the base-foc internal cap indices implementation from 16bit
-    size to 28 bit.
-    
-    Issue #5406
-
-commit ea3ed25431a6e36c2ecc4776e970eae4c4774b98
-Author: Alexander Boettcher <alexander.boettcher@genode-labs.com>
-Date:   Thu Jan 16 13:30:30 2025 +0100
-
-    base: support specifying PCI bdf on irq creation
-    
-    Required by the seL4 kernel interface for MSI creation and by another upstream
-    kernel.
-    
-    Issue #5423
-
-commit 2ad1c450eeb2697705db3553bb86cf55c6bf330e
-Author: Alexander Boettcher <alexander.boettcher@genode-labs.com>
-Date:   Thu Jan 16 09:41:48 2025 +0100
-
-    sel4: add MSI support for x86
-    
-    Fixes #5423
-
-commit db914eb952585a5175c7944c1d13a46efb7c3097
-Author: Alexander Boettcher <alexander.boettcher@genode-labs.com>
-Date:   Sat Feb 8 19:09:37 2025 +0100
-
-    foc: avoid unsynchronized vm state tracking
-    
-    _extra_dispatch_up is used by the ep and the vcpu
-    thread unsynchronized, which leads under sufficient load to race situations,
-    where both wait for each other and no one ever will continue. Remove
-    _extra_dispatch_up completely, which is not required, as the kernel interface
-    handles this specific state already.
-    
-    Fixes #5461
-
-commit 3fd747d4de58fc7d90e3bcce35e96168e3d28fb4
-Author: Alexander Boettcher <alexander.boettcher@genode-labs.com>
-Date:   Sun Feb 9 11:20:19 2025 +0100
-
-    sel4: avoid unsynchronized vm state tracking
-    
-    Remove _extra_dispatch_up which is not required and racy which may lead
-    to hangs between ep and vcpu thread.
-    
-    Issue #5461
-
+Finally, all modern kernels, namely NOVA, HW, Fiasco.OC and seL4 are now using
+the pre-bootloader feature of bender to enable the
+[https://genode.org/documentation/release-notes/22.11#Configurable_Intel_HWP_mode - Intel HWP]
+feature during boot time consistently.
 
 Build system and tools
 ######################
@@ -897,21 +818,19 @@ Thanks to Roman for this careful, tasteful, and comprehensive contribution!
 Meshcmd as alternative AMT tool
 ===============================
 
-; @alex-ab
+We use Intel Active Management Technology (AMT) on diverse native test hardware
+to forward serial output over network (SOL) to developer machines and to
+power-on, reset, and power-off test machines. Since
+[https://genode.org/documentation/release-notes/14.11#Improved_tooling_for_using_Intel_AMT - release 14.11]
+the available tools are wsman and amttool for power-cycling and
+[https://www.kraxel.org/blog/linux/amtterm/ - amtterm] for grabbing the SOL output.
 
-commit b50bbef3036e5e656eadf5e04e83937012149728
-Author: Alexander Boettcher <alexander.boettcher@genode-labs.com>
-Date:   Thu Nov 14 11:31:28 2024 +0100
+With this release we added a community contribution for supporting
+[https://www.meshcommander.com - meshcmd], which is
+available via [https://github.com/Ylianst/MeshCommander - github] and mentioned
+in release notes of
+[https://www.intel.com/content/www/us/en/developer/articles/news/meshcmd-new-intel-amt-command-line-tool.html - Intel].
+The tool can be used as replacement for amtterm and wsman/amttool. Beside
+the known amt-tool option 'wsman' and 'amttool' now 'meshcmd' can be specified:
 
-    tool: support meshcmd as AMT alternative tool
-    
-    which may be used as alternative for
-    
-    - AMT log grabbing, default: amtterm
-    - AMT power cycling, default: wsman, alternative: amttool
-    
-    https://www.meshcommander.com
-    https://github.com/Ylianst/MeshCommander
-    https://www.intel.com/content/www/us/en/developer/articles/news/meshcmd-new-intel-amt-command-line-tool.html
-
-
+! RUN_OPT += --amt-tool meshcmd
