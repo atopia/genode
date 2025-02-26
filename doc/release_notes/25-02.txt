@@ -55,7 +55,7 @@ supplements the notions of windows, virtual desktops, and keyboard focus.
 Among the window-manager clients, two components stand out by having special
 roles. The window layouter defines which application is presented at which
 part of the panorama by generating a window layout. The window layout is
-produced according a rules, which are configurable by the user and are
+produced according to rules, which are configurable by the user and are
 updated by interactive layout changes like moving a window. The decorator, in
 turn, paints window decorations according to this window layout. Note that
 neither the layouter nor the decorator are able to observe information
@@ -128,7 +128,7 @@ Improved focus switching and free-arrange layouting
 
 The switching within the focus history (Super-Tab) is now restricted to
 windows that are located at visible screens. This avoids the need to tab
-through invisible windows, which is can be confusing when using windows
+through invisible windows, which can be confusing when using windows
 scattered across several virtual desktops.
 
 Furthermore, the focus is now automatically changed to the most recently
@@ -149,15 +149,15 @@ nearby the window boundary).
 
 Up until now, the warping of a window to another screen required a manual
 modification of the layouter rules, which is arguably not perfectly user
-friendly. Now, for screens visible side by side in a multi-monitor setup, one
-can move a window from one screen to another by dragging the window title.
+friendly. Now, for screens visible side by side in a multi-monitor setup, a
+window can be moved from one screen to another by dragging the window title.
 When using screens as virtual desktops on one display, a window can be moved
 to another screen by switching the screen (by pressing a key matching a
 desired screen) while the window is dragged with the mouse. So the user can
 drag the window between virtual desktops.
 
 As an additional convenience, the currently focused window now be taken
-to another screen by pressing the wm-modifier key together with shift and
+to another screen by pressing the wm-modifier key together with Shift and
 the screen number.
 
 
@@ -177,39 +177,36 @@ The default rules contain now the definition of three displays ("primary",
 Multi-monitor virtual machines
 ------------------------------
 
-commit 0166291121ab87d0a926182f8c2af3c2e7eeac13
-Author: Christian Helmuth <christian.helmuth@genode-labs.com>
-Date:   Thu Nov 14 16:44:27 2024 +0100
+A notable client of the window manager in the multi-monitor setting is
+VirtualBox, a prime example for virtual machine monitors. For a seamless
+user experience, real displays must be integrated as virtual monitors inside
+the VM that can be dynamically enabled or disabled. The virtual monitors
+then reflect the physical display configuration and can, thus, be configured
+in the guest operating system as a virtual panorama as usual.
 
-    vbox6: multi-monitor support
-    
-    Support dynamic panorama of virtual displays. Virtual monitors for
-    VirtualBox must be configured in two steps.
-    
-    - <Display monitorCount="<num>"> nodes in the .vbox file defines the
-      number of _connectors_ and, thus, the maximum number of connected
-      virtual monitors.
-    
-    - Each enabled VirtualBox monitor requests a dedicated GUI session.
-      Enablement and labeling of these sessions is done via <monitor>
-      nodes in the component configuration like follows.
-    
-      <monitor label="DP-1"/>
-      <monitor label="HDMI-A-1"/>
-    
-    Labels can be used by the window manager to configure and place the
-    corresponding window. The order of the nodes directly controls the
-    connection order at the virtual graphics card.
-    
-    Fixes #5449
+For that purpose, we extended VirtualBox by a two-stage monitor
+configuration. First, the '<Display>' node in the .vbox configuration file
+defines the maximum number of potentially connected virtual monitors by the
+`monitorCount` attribute.
 
-commit c7bdc9dced95a9e4c561decfe09dda552420c716
-Author: Christian Helmuth <christian.helmuth@genode-labs.com>
-Date:   Mon Feb 10 12:27:32 2025 +0100
+!<Display VRAMSize="64" monitorCount="2"/>
 
-    Amend vbox6 runtimes / run scripts for monitor config
-    
-    Issue #5449
+Each enabled VirtualBox monitor requests a dedicated GUI session, which is
+equivalent to a windows on screen as described before. Now, the enablement
+and labeling of these sessions is done via '<monitor>' nodes in the
+VirtualBox runtime configuration like follows and supports up to
+'monitorCount' enabled monitors.
+
+!<monitor label="right"/>
+!<monitor label="left"/>
+
+The labels can be used in window-manager rules to configure and place the
+corresponding window inside the panorama. The order of the nodes directly
+controls the connection order at the virtual graphics card, which is
+important for the in-guest configuration of the virtual panorama. Note that,
+at least one monitor configuration node is required as otherwise no virtual
+monitor will be enabled in contrast to prior versions, which always enabled
+one monitor.
 
 
 Qemu on Genode
@@ -271,7 +268,7 @@ configuration.
 The current port is still work in progress. Further potential directions are
 the support of qemu-system-x86_64 and adding support for using Genode's VM
 session interface to leverage hardware-assisted virtualization, thereby
-complementing the existing Seoul VMM and the Virtualbox VMMs on x86 with a
+complementing the existing Seoul VMM and the VirtualBox VMMs on x86 with a
 further powerful option.
 
 
