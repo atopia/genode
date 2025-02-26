@@ -429,121 +429,24 @@ which is employed on 32-bit architectures and RISC-V.
 Qt, WebEngine, and Falkon browser
 #################################
 
-; @cproc
+A big motivation for the ongoing effort to update our Qt port from Qt5 to Qt6
+was the prospect of an updated Chromium web engine for the Falkon web browser as
+more and more web sites don't work correctly with Chromium version 83 of Qt 5.15.2
+anymore. This release now updates our Falkon port to version 24.01.75, which can
+be built with the newly added Qt 6.6.2 web engine port based on Chromium version
+112 in addition to the previous Qt 5.15.2 port.
 
-commit dd64164ed64a11e06cf61b490fc9b10e8eb57cef
-Author: Christian Prochaska <christian.prochaska@genode-labs.com>
-Date:   Mon Dec 9 08:36:53 2024 +0100
+Not all features of the previous Qt5-based Falkon are working yet, for example
+support for video capturing from a web cam is still missing, but other multimedia
+features like playing of YouTube videos are supported already.
 
-    qt6: split port into modules
-    
-    Fixes #5402
+Experimental Qt6 Falkon Sculpt packages are available in the 'cproc' depot, but
+require a Sculpt version built from the current Genode release, and will also be
+available for the upcoming official Sculpt release.
 
-commit fe18db4d34df010631c45550ebb73bdfa2a6e217
-Author: Christian Prochaska <christian.prochaska@genode-labs.com>
-Date:   Tue Jan 14 14:16:36 2025 +0100
-
-    qt6: add 'SvgWidgets' files
-    
-    Fixes #5419
-
-commit 6c1af53909f4ab6aa71d2bf8894a27ccdc47a490
-Author: Christian Prochaska <christian.prochaska@genode-labs.com>
-Date:   Wed Jan 15 04:22:29 2025 +0100
-
-    qt6: add 'i18n' example
-    
-    Fixes #5421
-
-commit 9beb47812e07c25e8c86e5e35333e1f8a253ca4f
-Author: Christian Prochaska <christian.prochaska@genode-labs.com>
-Date:   Thu Feb 13 14:11:18 2025 +0100
-
-    qt5: move WebEngine-related API recipes to genode-world
-    
-    Fixes #5452
-
-commit e3f5f16ba4631dfcda58c5f5fe83e986336dd424
-Author: Christian Prochaska <christian.prochaska@genode-labs.com>
-Date:   Fri Feb 14 10:04:32 2025 +0100
-
-    qt5: set CMAKE_SHARED_LIBRARY_SONAME_C_FLAG variable
-    
-    Fixes #5453
-
-commit cc0fa54cbfbe05db7948f7445af86991245278ab
-Author: Christian Prochaska <christian.prochaska@genode-labs.com>
-Date:   Fri Feb 14 10:27:11 2025 +0100
-
-    qt: support extra CMake flags
-    
-    Fixes #5454
-
-commit 060c242afc78546049b7c86c47cbdacccb5ddcc5
-Author: Christian Prochaska <christian.prochaska@genode-labs.com>
-Date:   Fri Feb 21 08:44:34 2025 +0100
-
-    qt6: add qt5compat module
-    
-    Fixes #5458
-
-commit addce529e3a39c481dd713ccb3bd3a9ad9bfee21
-Author: Christian Prochaska <christian.prochaska@genode-labs.com>
-Date:   Fri Feb 21 11:25:35 2025 +0100
-
-    qt6: add qtwebchannel and qtwebengine APIs
-    
-    Fixes #5459
-
-; genode-world.git:
-
-commit ae21e7930fb6f6241b7fa3f8ba4b2f879c9b13f0
-Author: Christian Prochaska <christian.prochaska@genode-labs.com>
-Date:   Thu Feb 13 13:34:25 2025 +0100
-
-    Add Qt5WebEngine-related API recipes
-    
-    Fixes #387
-
-commit 78a4aefe2a3533bed5ad5f742f0da5fdaf4eb7fe
-Author: Christian Prochaska <christian.prochaska@genode-labs.com>
-Date:   Sun Sep 8 19:32:43 2024 +0200
-
-    qt5_webengine: add REQUIRES in target.mk
-    
-    Fixes #388
-
-commit 837d14ba0e8a89f27a19998371cb9a562df3e4b7
-Author: Christian Prochaska <christian.prochaska@genode-labs.com>
-Date:   Fri Feb 14 10:47:02 2025 +0100
-
-    falkon: build with CMake
-    
-    Fixes #389
-
-commit 74533a5f89fed29184835efde4fade53df8bc2a5
-Author: Christian Prochaska <christian.prochaska@genode-labs.com>
-Date:   Tue Feb 18 11:45:30 2025 +0100
-
-    falkon: update to version 24.01.75
-    
-    Fixes #390
-
-commit 229bedf016449a769a842036773ad2787625d303
-Author: Christian Prochaska <christian.prochaska@genode-labs.com>
-Date:   Fri Feb 21 11:04:41 2025 +0100
-
-    add Qt6 webchannel and webengine modules
-    
-    Fixes #391
-
-commit c9f3ca917dd2b702906b5434fc3812b2c8ae198a
-Author: Christian Prochaska <christian.prochaska@genode-labs.com>
-Date:   Fri Feb 21 15:11:32 2025 +0100
-
-    add Qt6-based Falkon
-    
-    Fixes #392
+Aside from the new Qt6 web engine and Falkon ports, we also split the previous
+Qt6 port into smaller ports for the individual Qt modules to avoid having to
+download and store the huge QtWebEngine code base when it is not needed.
 
 
 Device drivers
