@@ -192,7 +192,7 @@ defines the maximum number of potentially connected virtual monitors by the
 !<Display VRAMSize="64" monitorCount="2"/>
 
 Each enabled VirtualBox monitor requests a dedicated GUI session, which is
-equivalent to a windows on screen as described before. Now, the enablement
+equivalent to a window on screen as described before. Now, the enablement
 and labeling of these sessions is done via '<monitor>' nodes in the
 VirtualBox runtime configuration like follows and supports up to
 'monitorCount' enabled monitors.
@@ -205,7 +205,7 @@ corresponding window inside the panorama. The order of the nodes directly
 controls the connection order at the virtual graphics card, which is
 important for the in-guest configuration of the virtual panorama. Note that,
 at least one monitor configuration node is required as otherwise no virtual
-monitor will be enabled in contrast to prior versions, which always enabled
+monitor will be enabled. This is in contrast to prior versions, which always enabled
 one monitor.
 
 
@@ -573,8 +573,8 @@ diagnostics about the hardware state during a fault when executing a
 core's thread or kernel context.
 
 In order to support modern x86 hardware that doesn't feature a legacy
-Programmable Interval Timer, we have consolidated the calibration of the Time
-Stamp Counter and Local APIC to use the ACPI timer during bootstrap and provide
+programmable interval timer (PIT), we have consolidated the calibration of the time
+stamp counter (TSC) and local APIC to use the ACPI timer during bootstrap and provide
 the base-hw kernel with the calibration values as part of the boot information.
 
 NOVA microhypervisor
