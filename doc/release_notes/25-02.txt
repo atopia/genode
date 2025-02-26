@@ -278,8 +278,6 @@ Base framework and OS-level infrastructure
 Init configuration improvements
 ===============================
 
-; @nfeske
-
 Simplified RAM assignments
 --------------------------
 
