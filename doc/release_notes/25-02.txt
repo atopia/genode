@@ -51,11 +51,11 @@ part whereas the HDMI capture client obtains the right part.
 The window manager (wm) uses the nitpicker GUI server as client and acts
 as a GUI server itself, providing the same interface as nitpicker. Sitting
 in-between the nitpicker GUI server and the application, it transparently
-supplements the notions of windows, virtual desktops, and keyboard focus.
+supplements the notions of windows, virtual desktops, and the keyboard focus.
 Among the window-manager clients, two components stand out by having special
-roles. The window layouter defines which application is presented at which
-part of the panorama by generating a window layout. The window layout is
-produced according to rules, which are configurable by the user and are
+roles. The window layouter defines which application is presented at what location
+in the panorama by generating a window layout. The window layout is
+produced according to user configurable rules, which are
 updated by interactive layout changes like moving a window. The decorator, in
 turn, paints window decorations according to this window layout. Note that
 neither the layouter nor the decorator are able to observe information
@@ -93,7 +93,7 @@ the left-most captured rectangle of the panorama.
 To get more precise control over the assignment of captured areas to displays,
 a display node can host any number of '<capture>' sub nodes that are matched
 against the captured areas present within the panorama. The panorama areas are
-named after the labels of capture clients (i.e., display drivers) present at
+named after the labels of capture clients (i.e., display drivers) connected to
 the nitpicker GUI server. The matching can be expressed via the attributes
 'label', 'label_prefix', and 'label_suffix'. The first match applies.
 E.g., the following configuration may be useful for a laptop that is sometimes
@@ -123,8 +123,8 @@ leverage the '<merge>' feature of the display driver. Should a '<screen>' lack
 a valid display attribute, it spans the entire panorama.
 
 
-Improved focus switching and free-arrange layouting
----------------------------------------------------
+Improved focus switching and free-arrangeable layouts
+-----------------------------------------------------
 
 The switching within the focus history (Super-Tab) is now restricted to
 windows that are located at visible screens. This avoids the need to tab
@@ -139,7 +139,7 @@ temporary window appears, it needs to be focused manually (to prevent focus
 stealing). But once the temporary window disappears, the focus returns to the
 previously focused window.
 
-For interactively moving or resizing a window, the user needed good aim to
+For interactively moving or resizing a window, the user needs a good aim to
 grab the corresponding window handles as presented by the decorator. We have
 now supplemented the ability to click anywhere within a window while the
 wm-modifier key (i.e., Super) is held. Depending on the position within the
@@ -170,8 +170,8 @@ reflecting the date of change (24.12), we prevent the loss of window-layout
 state when switching back and forth between different versions of the
 window layouter.
 
-The default rules contain now the definition of three displays ("primary",
-"secondary", and "ternary") and map 3 screens to each display.
+The default rules now contain the definitions of three displays ("primary",
+"secondary", and "ternary") and map three screens to each display.
 
 
 Multi-monitor virtual machines
@@ -182,7 +182,7 @@ VirtualBox, a prime example for virtual-machine monitors. For a seamless
 user experience, real displays must be integrated as virtual monitors inside
 the VM that can be dynamically enabled or disabled. The virtual monitors
 then reflect the physical display configuration and can, thus, be configured
-in the guest operating system as a virtual panorama as usual.
+in the guest operating system as a virtual panorama.
 
 For that purpose, we extended VirtualBox by a two-stage monitor
 configuration. First, the '<Display>' node in the .vbox configuration file
@@ -192,10 +192,10 @@ defines the maximum number of potentially connected virtual monitors by the
 !<Display VRAMSize="64" monitorCount="2"/>
 
 Each enabled VirtualBox monitor requests a dedicated GUI session, which is
-equivalent to a window on screen as described before. Now, the enablement
+equivalent to a window on screen as described above. Now, the enablement
 and labeling of these sessions is done via '<monitor>' nodes in the
-VirtualBox runtime configuration like follows and supports up to
-'monitorCount' enabled monitors.
+VirtualBox runtime configuration as follows where up to 'monitorCount'
+monitors are supported.
 
 !<monitor label="right"/>
 !<monitor label="left"/>
@@ -214,27 +214,25 @@ Qemu on Genode
 
 [https://en.wikipedia.org/wiki/QEMU - Qemu] is an all-purpose open-source tool
 for cross-architecture emulation for whole operating systems. Its merits for
-efficient and rapid developments are unmatched for a lot of system developers.
-It is in very active use during Genode's development.
+efficient and rapid developments are unmatched for many system developers.
+It thereby plays a very important role in Genode development.
 
-We long for using Qemu natively on Genode since quite a time, e.g., documented
-by the [https://github.com/genodelabs/genode/issues/116 - GitHub issue] dated
-back to 2012. Actually, in 2019 there was already the attempt -
-as documented in the issue - to get it up and running,
+We have longed for using Qemu natively on Genode for quite a time now - as documented
+by this [https://github.com/genodelabs/genode/issues/116 - GitHub issue], which
+dates back to 2012. Actually, in 2019 there was already an attempt (see the issue) to get Qemu up and running,
 which - well - succeeded to the degree that it compiled and linked. At that
 time the build system of Qemu was way too complex to be used directly
-with the Genode framework and hand-made solutions were common.
+by the Genode framework and hand-made solutions were common.
 Usually, once the initial rush of motivation drops, such on-off efforts tend to
-become neglected,
-which happened to happen also for this 2019 attempt. So the approach was
-condemned to fail for the long run.
+become neglected, which happened to happen also for the 2019 Qemu attempt. So
+the approach was condemned to fail in the long run.
 
 Since then, the [https://github.com/genodelabs/goa - Goa] tool entered the
-picture and evolved over the years to the point to give a Qemu port another
+picture and evolved over the years to the point where it became tempting to give a Qemu port a second
 try. The approach of Goa to reuse the unmodified build infrastructure of the
 3rd-party software
-as closely as possible induced hope. Hence, over the last year, we
-worked on bringing Qemu with the help of Goa to Genode, and we are happy to
+as closely as possible induced hope. Hence, over the last year, we have
+worked on bringing Qemu - with the help of Goa - to Genode and we are happy to
 announce a state that is able to run Qemu 9.0.1 on
 x86_64 for emulating ARM target architectures, e.g. qemu-system-aarch64
 and qemu-system-arm.
@@ -257,17 +255,17 @@ Those files can then be adjusted for the desired board to emulate, e.g:
 ! <arg value="-kernel"/>    <arg value="/image_raspi3b"/>
 ! ...
 
-The example shows the familiar Qemu configuration options in form of Genode's XML
-configuration style. In this case, a Raspberry PI 3b target
-is set up, which expects a kernel image named _image_raspi3b_
+The example shows the familiar Qemu configuration options in Genode's XML
+configuration style. In the example above, a Raspberry PI 3b target
+has been set up that expects a kernel image named _image_raspi3b_
 to be located next to the configuration file.
 After adjusting the configuration file,
 the component merely needs to be restarted and Qemu will boot with the new
 configuration.
 
 The current port is still work in progress. Further potential directions are
-the support of qemu-system-x86_64 and adding support for using Genode's VM
-session interface to leverage hardware-assisted virtualization, thereby
+the support of qemu-system-x86_64 and support for Genode's VM
+session interface to leverage hardware-assisted virtualization, and thereby
 complementing the existing Seoul VMM and the VirtualBox VMMs on x86 with a
 further powerful option.
 
@@ -428,9 +426,9 @@ Qt, WebEngine, and Falkon browser
 
 A big motivation for the ongoing effort to update our Qt port from Qt5 to Qt6
 was the prospect of an updated Chromium web engine for the Falkon web browser as
-more and more websites don't work correctly with Chromium version 83 of Qt 5.15.2
-anymore. This release now updates our Falkon port to version 24.01.75, which can
-be built with the newly added Qt 6.6.2 web engine port based on Chromium version
+more and more websites stopped working correctly with Chromium version 83 of Qt 5.15.2
+anymore. This release updates our Falkon port to version 24.01.75, which can
+be built with the freshly added Qt 6.6.2 web engine port based on Chromium version
 112 in addition to the previous Qt 5.15.2 port.
 
 Not all features of the previous Qt5-based Falkon are working yet, for example
@@ -487,10 +485,11 @@ Reform. With the current release, we extend the range of devices capable to run
 Sculpt OS by another board featuring this SoC, namely the armStone board from
 F&S Embedded.
 
-As it is based on the same SoC, we were able to reuse most drivers for platform, USB,
-MMC, or Ethernet. But to drive the more complex and board specific conglomerate
-of display engine and differing connectors (HDMI instead of MIPI-DSI), we ported
-an alternative framebuffer driver from the vendor's Linux kernel fork to Genode.
+As it is based on the same SoC, we were able to reuse most drivers for the
+platform like USB, MMC, or Ethernet. But to enable the more complex and board
+specific conglomerate of the display engine and differing connectors (HDMI instead
+of MIPI-DSI), we ported an alternative framebuffer driver from the vendor's
+Linux kernel fork to Genode.
 
 With most peripheral drivers in place, we can now provide another instance of
 Sculpt OS running on top of the armStone board. To facilitate the build of an
@@ -549,38 +548,38 @@ Execution on bare hardware (base-hw)
 Genode's custom kernel supports the notion of IPC-helping since the very
 beginning. This concept means that one thread calling another one via an
 Inter-Process-Communication (IPC) message will lend its own scheduling-abilities to the
-target thread. As the caller will block until it gets a response, it is a
+target thread. As the caller will block until it receives a response, this is a
 nice property to pass its time to the target side, which acts on behalf of
 the caller anyway.
 This nice concept was originally inspired by the NOVA kernel. However, in
-contrast to NOVA and some other L4-like microkernels, the base-hw kernel does
+contrast to NOVA and most L4-like microkernels, the base-hw kernel does
 not use the IPC mechanism to forward page-faults to the pager thread that should
 resolve it. Thereby, all scheduling parameters, like priorities and CPU quanta
 that we can distribute in the system, are valid across component boundaries when
 using IPC, except for page-faults. But this can lead to unwanted
-interferences in between components of different priority that depend on the
+interferences in between components of different priority bands that depend on the
 same pager thread.
 Therefore, we have generalized the notion of helping in our custom kernel to
 lend a thread's scheduling properties not only when doing IPC, but also when a
-page-fault got triggered. Moreover, there is not only one global pager thread
+page-fault occurs. Moreover, there is not only one global pager thread
 available anymore, but one pager thread per CPU.
 
 To aid debugging during development of the base system, e.g., when adding new
-features or new platforms to the kernel, we add additional detection and
-diagnostics about the hardware state during a fault when executing a
-core's thread or kernel context.
+features or new platforms to the kernel, we have added additional detection and
+diagnostics about the hardware state should a page fault occur in unexpected
+conditions.
 
 In order to support modern x86 hardware that doesn't feature a legacy
 programmable interval timer (PIT), we have consolidated the calibration of the time
 stamp counter (TSC) and local APIC to use the ACPI timer during bootstrap and provide
-the base-hw kernel with the calibration values as part of the boot information.
+the base-hw kernel with these calibration values as part of the boot information.
 
 NOVA microhypervisor
 ====================
 
 With this release we added support to detect and parse x2APIC entries
 of the ACPI [https://wiki.osdev.org/MADT - MADT] tables, which contain
-information to find and setup all CPUs during initialization of the NOVA
+information to locate and configure all CPUs during initialization of the NOVA
 kernel. Even though the x2APIC feature is required to support more than
 256 CPUs, our actual motivation was a new Intel Meteor Lake based Framework
 notebook with 24 CPUs. For this specific notebook, however, no MADT entries for
@@ -593,7 +592,7 @@ Lifted limitations on Fiasco.OC and seL4
 ========================================
 
 During preparation of the 'Celebrating kernel diversity with Genode' talk
-at the open source conference
+at
 [https://fosdem.org/2025/schedule/event/fosdem-2025-5768-celebrating-kernel-diversity-with-genode - FOSDEM 2025],
 the Fiasco.OC and seL4 based platforms received several improvements in
 order to demo their principal working states with Sculpt OS.
@@ -675,7 +674,7 @@ like this:
 Over the years and with the number of run scripts growing, those preconditions
 have become complex and many. Moreover, run scripts backing out because of
 an unsatisfied precondition are not easy to distinguish from successful run
-scripts when executed in automated fashion. Thanks to the welcome
+scripts when executed in an automated fashion. Thanks to the welcome
 [https://github.cokm/genodelabs/genode/issues/5432 - initiative] of Roman Iten
 of [https://gapfruit.com - Gapfruit], the precondition checks for executing
 run scripts have now become largely streamlined and much simpler.
@@ -719,11 +718,12 @@ the available tools are wsman and amttool for power-cycling and
 
 With this release, we added a community contribution for supporting
 [https://www.meshcommander.com - meshcmd], which is
-available via [https://github.com/Ylianst/MeshCommander - github] and mentioned
-in release notes of
-[https://www.intel.com/content/www/us/en/developer/articles/news/meshcmd-new-intel-amt-command-line-tool.html - Intel].
+available via [https://github.com/Ylianst/MeshCommander - GitHub] and mentioned
+in
+[https://www.intel.com/content/www/us/en/developer/articles/news/meshcmd-new-intel-amt-command-line-tool.html - Intel]'s 
+release notes.
 The tool can be used as replacement for amtterm and wsman/amttool.
 Alternatively to the known amt-tool option 'wsman' and 'amttool',
-now 'meshcmd' can be specified:
+'meshcmd' can now be specified as a RUN_OPT:
 
 ! RUN_OPT += --amt-tool meshcmd
