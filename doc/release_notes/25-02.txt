@@ -561,7 +561,7 @@ using IPC, except for page-faults. But this can lead to unwanted
 interferences in between components of different priority that depend on the
 same pager thread.
 Therefore, we have generalized the notion of helping in our custom kernel to
-borrow a thread's scheduling properties not only when doing IPC, but also when a
+lend a thread's scheduling properties not only when doing IPC, but also when a
 page-fault got triggered. Moreover, there is not only one global pager thread
 available anymore, but one pager thread per CPU.
 
@@ -581,7 +581,7 @@ NOVA microhypervisor
 With this release we added support to detect and parse x2APIC entries
 of the ACPI [https://wiki.osdev.org/MADT - MADT] tables, which contain
 information to find and setup all CPUs during initialization of the NOVA
-kernel. Even so the x2APIC feature is required to support more than
+kernel. Even though the x2APIC feature is required to support more than
 256 CPUs, our actual motivation was a new Intel Meteor Lake based Framework
 notebook with 24 CPUs. For this specific notebook, however, no MADT entries for
 local APIC entries were available, just the x2APIC entries. We used this
@@ -629,7 +629,7 @@ generated files untouched (unless provided with the '--rebuild' flag).
 
 Autoconf-based projects are now pointed to the used API archives for looking up
 pkg-config files. This prevents pkg-config from accidentally pulling library
-information from the host system and instead only take this information from
+information from the host system and instead only takes this information from
 _*.pc_ files in the referenced depot archives.
 
 Furthermore, we updated the built-in depot archive versions to Sculpt 24.10.3.
@@ -690,7 +690,7 @@ is conveniently printed in the log. However, a more instructive message can
 be specified as an optional second argument.
 
 To make this pattern as ergonomic and natural as possible, the naming of the
-run tool's various checking functions have been unified and slightly extended.
+run tool's various checking functions has been unified and slightly extended.
 The former 'get_cmd_switch' and 'get_cmd_arg' functions are now named
 'have_cmd_switch' and 'cmd_arg'. A new 'have_recipe' function returns true
 whenever the specified depot recipe is present. This way, the compatibility
