@@ -40,7 +40,7 @@ The GUI stack comprises the following components.
 
 At the bottom, one or more display drivers access the physical monitors
 attached to the machine. For each monitor, the driver maintains a distinct
-physical frame buffer and creates a capture session at the GUI server.
+physical framebuffer and creates a capture session at the GUI server.
 From the perspective of the GUI server, a display driver appears as a GUI
 capturing client, not unlike a screen recorder. The GUI server maintains a
 single panorama, which is a 2D coordinate system where GUI applications are
@@ -156,7 +156,7 @@ to another screen by switching the screen (by pressing a key matching a
 desired screen) while the window is dragged with the mouse. So the user can
 drag the window between virtual desktops.
 
-As an additional convenience, the currently focused window now be taken
+As an additional convenience, the currently focused window can now be taken
 to another screen by pressing the wm-modifier key together with Shift and
 the screen number.
 
@@ -178,7 +178,7 @@ Multi-monitor virtual machines
 ------------------------------
 
 A notable client of the window manager in the multi-monitor setting is
-VirtualBox, a prime example for virtual machine monitors. For a seamless
+VirtualBox, a prime example for virtual-machine monitors. For a seamless
 user experience, real displays must be integrated as virtual monitors inside
 the VM that can be dynamically enabled or disabled. The virtual monitors
 then reflect the physical display configuration and can, thus, be configured
@@ -212,9 +212,9 @@ one monitor.
 Qemu on Genode
 ##############
 
-[https://en.wikipedia.org/wiki/QEMU - Qemu] is an all purpose open-source tool
+[https://en.wikipedia.org/wiki/QEMU - Qemu] is an all-purpose open-source tool
 for cross-architecture emulation for whole operating systems. Its merits for
-efficient and rapid developments is unmatched for a lot of system developers.
+efficient and rapid developments are unmatched for a lot of system developers.
 It is in very active use during Genode's development.
 
 We long for using Qemu natively on Genode since quite a time, e.g., documented
@@ -234,7 +234,7 @@ picture and evolved over the years to the point to give a Qemu port another
 try. The approach of Goa to reuse the unmodified build infrastructure of the
 3rd-party software
 as closely as possible induced hope. Hence, over the last year, we
-worked on bringing Qemu with the help of goa to Genode and we are happy to
+worked on bringing Qemu with the help of Goa to Genode, and we are happy to
 announce a state that is able to run Qemu 9.0.1 on
 x86_64 for emulating ARM target architectures, e.g. qemu-system-aarch64
 and qemu-system-arm.
@@ -242,7 +242,7 @@ and qemu-system-arm.
 The Goa sources of the port are available via alex-ab's
 [https://github.com/alex-ab/goa-projects/commits/qemu_25_02 - Goa repository].
 Additionally, ready-to-use packages for Sculpt OS 24.10 are available.
-After downloading the packages via alex-ab' Sculpt index and
+After downloading the packages via alex-ab's Sculpt index and
 deploying them, initial configuration files named _config.qemu.aarch64_ or
 _config.qemu.arm_ will be imported into the selected file system.
 Those files can then be adjusted for the desired board to emulate, e.g:
@@ -365,7 +365,7 @@ easier to express.
 Enriched file-system session-label convention
 =============================================
 
-Genode 25.02 changes the way of how a client-selected sub directory is
+Genode 25.02 changes the way of how a client-selected subdirectory is
 communicated to the file-system server at session-creation time. The former
 opaque session argument is now passed as last label element, which allows for
 the flexible tweaking of this argument by init's session-routing and
@@ -428,13 +428,13 @@ Qt, WebEngine, and Falkon browser
 
 A big motivation for the ongoing effort to update our Qt port from Qt5 to Qt6
 was the prospect of an updated Chromium web engine for the Falkon web browser as
-more and more web sites don't work correctly with Chromium version 83 of Qt 5.15.2
+more and more websites don't work correctly with Chromium version 83 of Qt 5.15.2
 anymore. This release now updates our Falkon port to version 24.01.75, which can
 be built with the newly added Qt 6.6.2 web engine port based on Chromium version
 112 in addition to the previous Qt 5.15.2 port.
 
 Not all features of the previous Qt5-based Falkon are working yet, for example
-support for video capturing from a web cam is still missing, but other multimedia
+support for video capturing from a webcam is still missing, but other multimedia
 features like playing of YouTube videos are supported already.
 
 Experimental Qt6 Falkon Sculpt packages are available in the 'cproc' depot, but
@@ -481,7 +481,7 @@ interface, which is the new default (if supported by the platform).
 Sculpt-OS compatibility with F&S i.MX 8MP armStone
 ==================================================
 
-During the past six months, a lot effort was spent to support additional NXP i.MX
+During the past six months, a lot of effort was spent to support additional NXP i.MX
 8M Plus centered devices, like the Compulab IOT Gateway and the MNT Pocket
 Reform. With the current release, we extend the range of devices capable to run
 Sculpt OS by another board featuring this SoC, namely the armStone board from
@@ -493,7 +493,7 @@ of display engine and differing connectors (HDMI instead of MIPI-DSI), we ported
 an alternative framebuffer driver from the vendor's Linux kernel fork to Genode.
 
 With most peripheral drivers in place, we can now provide another instance of
-Sculpt-OS running on top of the armStone board. To facilitate the build of an
+Sculpt OS running on top of the armStone board. To facilitate the build of an
 SD-card image, you can extend the RUN_OPT variable by:
 
 ! RUN_OPT += --include image/armstone_sdcard
@@ -523,7 +523,7 @@ USB-Attached-SCSI (UAS) alternate setting rather than the bulk-only interface
 it supports.
 
 With the fix that includes the alternate setting number in the selection
-process in place the order is now of no consequence and the affected devices
+process in place, the order is now of no consequence and the affected devices
 are working.
 
 
@@ -548,7 +548,7 @@ Execution on bare hardware (base-hw)
 
 Genode's custom kernel supports the notion of IPC-helping since the very
 beginning. This concept means that one thread calling another one via an
-Inter-Process-Communication (IPC) message will borrow its own scheduling-abilities to the
+Inter-Process-Communication (IPC) message will lend its own scheduling-abilities to the
 target thread. As the caller will block until it gets a response, it is a
 nice property to pass its time to the target side, which acts on behalf of
 the caller anyway.
@@ -565,7 +565,7 @@ borrow a thread's scheduling properties not only when doing IPC, but also when a
 page-fault got triggered. Moreover, there is not only one global pager thread
 available anymore, but one pager thread per CPU.
 
-To aid debugging during development of the base system, e.g.: when adding new
+To aid debugging during development of the base system, e.g., when adding new
 features or new platforms to the kernel, we add additional detection and
 diagnostics about the hardware state during a fault when executing a
 core's thread or kernel context.
@@ -583,7 +583,7 @@ of the ACPI [https://wiki.osdev.org/MADT - MADT] tables, which contain
 information to find and setup all CPUs during initialization of the NOVA
 kernel. Even so the x2APIC feature is required to support more than
 256 CPUs, our actual motivation was a new Intel Meteor Lake based Framework
-notebook with 24 CPUs. For this specific notebook however, no MADT entries for
+notebook with 24 CPUs. For this specific notebook, however, no MADT entries for
 local APIC entries were available, just the x2APIC entries. We used this
 circumstance to synchronize and harmonize the local APIC implementation of
 the NOVA upstream development with the NOVA version as used by Genode.
@@ -603,7 +603,7 @@ by extending the core component to look up the initial ACPI RSDP
 information. Additionally, the base-foc capability-selector management in
 Genode got extended to support more capability selectors.
 
-The base-sel4 platform received support to setup and use MSI interrupts for
+The base-sel4 platform received support to set up and use MSI interrupts for
 all devices and associated drivers, which improved the success rate of
 Sculpt OS noticeable on modern notebooks.
 
@@ -656,7 +656,7 @@ build-description file.
 Second, the tool chain does not allow for the use of SSE4 compiler intrinsics
 on x86 by default. Instead of merely enabling SSE4 via the '-msse4' compiler
 argument, we decided to globally switch to the '-march=x86-64-v2' profile to
-denote the processor generation with all its features as common base line.
+denote the processor generation with all its features as common baseline.
 The profile corresponds to Intel Core processors of the year 2010 or newer.
 
 
@@ -677,7 +677,7 @@ have become complex and many. Moreover, run scripts backing out because of
 an unsatisfied precondition are not easy to distinguish from successful run
 scripts when executed in automated fashion. Thanks to the welcome
 [https://github.cokm/genodelabs/genode/issues/5432 - initiative] of Roman Iten
-of [https://gapfruit.com - Gapfruit, the precondition checks for executing
+of [https://gapfruit.com - Gapfruit], the precondition checks for executing
 run scripts have now become largely streamlined and much simpler.
 
 The run tool has been extended by an 'assert' function that is dedicated for
@@ -700,7 +700,7 @@ enumeration of supported boards:
 
 ! assert {[have_recipe pkg/[drivers_interactive_pkg]]}
 
-The change of the run tool is accompanied with an improvement of Genode's
+The change of the run tool is accompanied by an improvement of Genode's
 autopilot tool that now distinguishes unsatisfied run scripts from successfully
 executed run scripts.
 
