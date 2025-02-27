@@ -555,7 +555,7 @@ the caller anyway.
 This nice concept was originally inspired by the NOVA kernel. However, in
 contrast to NOVA and some other L4-like microkernels, the base-hw kernel does
 not use the IPC mechanism to forward page-faults to the pager thread that should
-resolve it. Thereby, all scheduling parameters, like priorities and CPU quantums
+resolve it. Thereby, all scheduling parameters, like priorities and CPU quanta
 that we can distribute in the system, are valid across component boundaries when
 using IPC, except for page-faults. But this can lead to unwanted
 interferences in between components of different priority that depend on the
