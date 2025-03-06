@@ -41,6 +41,7 @@ namespace Board {
 
 	enum Custom_trapnos : uint64_t {
 		TRAP_VMEXIT = 256,
+		TRAP_VMSKIP = 257,
 	};
 };
 
@@ -71,9 +72,7 @@ struct Board::Vcpu_context
 	uint64_t tsc_aux_host = 0U;
 	uint64_t tsc_aux_guest = 0U;
 	uint64_t exit_reason = EXIT_PAUSED;
-
 	Init_state init_state { Init_state::CREATED };
-
 
 	static Virt_interface &detect_virtualization(Vcpu_data &vcpu_data,
 	                                             unsigned   id)

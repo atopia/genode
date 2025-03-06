@@ -23,33 +23,16 @@ namespace Hypervisor {
 	using Call_ret = Genode::umword_t;
 
 
-	inline void restore_state_for_entry(Call_arg regs, Call_arg fpu_context)
+	inline void jump_to_kernel_entry(Genode::addr_t stack_start, Genode::uint64_t trap_value)
 	{
 		asm volatile(
-		      "fxrstor (%[fpu_context]);"
-		      "mov  %[regs], %%rsp;"
-		      "popq %%r8;"
-		      "popq %%r9;"
-		      "popq %%r10;"
-		      "popq %%r11;"
-		      "popq %%r12;"
-		      "popq %%r13;"
-		      "popq %%r14;"
-		      "popq %%r15;"
-		      "popq %%rax;"
-		      "popq %%rbx;"
-		      "popq %%rcx;"
-		      "popq %%rdx;"
-		      "popq %%rdi;"
-		      "popq %%rsi;"
-		      "popq %%rbp;"
-		      "sti;" /* maybe enter the kernel to handle an external
-		                interrupt that occured ... */
-		      "nop;"
-		      "cli;" /* ... otherwise, just disable interrupts again */
+		      "mov  %[stack], %%rsp;"
+		      "subq $568, %%rsp;" /* keep room for fpu and general-purpose registers */
+		      "pushq %[trap_val];" /* make the stack point to trapno, the right place */
 		      "jmp _kernel_entry;"
 		      :
-		      : [regs] "r"(regs), [fpu_context] "r"(fpu_context)
+		      : [stack]    "r" (stack_start),
+		        [trap_val] "i"(trap_value)
 
 		      : "memory");
 	};

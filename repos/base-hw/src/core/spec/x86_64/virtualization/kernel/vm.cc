@@ -54,29 +54,17 @@ Vm::~Vm()
 }
 
 
-void Vm::run()
-{
-	if (_vcpu_context.init_state == Board::Vcpu_context::Init_state::CREATED) {
-		_vcpu_context.exit_reason = Board::EXIT_STARTUP;
-		_vcpu_context.init_state  = Board::Vcpu_context::Init_state::INITIALIZING;
-		_context.submit(1);
-		return;
-	}
-
-	_sync_from_vmm();
-	if (_scheduled != ACTIVE) Cpu_context::_activate();
-	_scheduled = ACTIVE;
-}
-
-
 void Vm::proceed()
 {
 	using namespace Board;
 
-	if (_vcpu_context.init_state == Board::Vcpu_context::Init_state::INITIALIZING) {
+	if (_vcpu_context.init_state == Vcpu_context::Init_state::CREATED) {
 		_vcpu_context.initialize(_cpu(),
 		    reinterpret_cast<addr_t>(_id.table));
 		_vcpu_context.tsc_aux_host = _cpu().id();
+		_vcpu_context.init_state = Vcpu_context::Init_state::INITIALIZING;
+		Hypervisor::jump_to_kernel_entry(_cpu().stack_start(), TRAP_VMSKIP);
+		/* jumps to _kernel_entry */
 	}
 
 	Cpu::Ia32_tsc_aux::write(
@@ -141,6 +129,16 @@ void Vm::exception(Genode::Cpu_state &state)
 		case Cpu_state::INTERRUPTS_START ... Cpu_state::INTERRUPTS_END:
 			_interrupt(_user_irq_pool);
 			break;
+		case TRAP_VMSKIP:
+			/* vCPU is running for the first time */
+			/*
+			 * We set the artificial startup exit code, stop the
+			 * vCPU thread and ask the VMM to handle it.
+			 */
+			_vcpu_context.init_state = Vcpu_context::Init_state::STARTED;
+			_vcpu_context.exit_reason = EXIT_STARTUP;
+			pause = true;
+			break;
 		default:
 			error("VM: triggered unknown exception ",
 			              _vcpu_context.regs->trapno,
@@ -173,9 +171,12 @@ void Vm::_sync_to_vmm()
 
 void Vm::_sync_from_vmm()
 {
+	/* first run() will skip through to issue startup exit */
+	if (_vcpu_context.init_state == Board::Vcpu_context::Init_state::CREATED)
+		return;
+
 	_vcpu_context.read_vcpu_state(_state);
 }
-
 
 Board::Vcpu_context::Vcpu_context(unsigned id, Vcpu_data &vcpu_data)
 :
